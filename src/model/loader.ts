@@ -30,6 +30,13 @@ export class ModelLoader {
     this.initWatcher();
   }
 
+  /**
+   * Get the file path for this loader
+   */
+  getPath(): string {
+    return this.path;
+  }
+
   private initWatcher() {
     if (this.watcherInitialized) return;
     try {

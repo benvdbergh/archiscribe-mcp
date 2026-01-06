@@ -95,6 +95,12 @@ export interface CreateViewInput {
   documentation?: string;
   /** Optional: Custom properties */
   properties?: Record<string, string>;
+  /** Optional: Element IDs in view */
+  elements?: string[];
+  /** Optional: Relationship IDs in view */
+  relationships?: string[];
+  /** Optional: Node hierarchy (parent-child relationships) */
+  nodeHierarchy?: Array<{ parentElement: string; childElement: string }>;
 }
 
 export interface UpdateViewInput {

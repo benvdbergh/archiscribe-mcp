@@ -1,8 +1,8 @@
 {
-  "modelPath": "data/archimate-scribe-demo-model.xml",
+  "modelPath": "/home/ben/Knowledge/Projects/PAI-Standalone/architecture/model.archimate",
   "viewsFilterByProperty": false,
   "viewsFilterPropertyName": "AI-Context",
-  "serverPort": 3030,
+  "serverPort": 3090,
   "enableHttpEndpoints": false,
   "logPath": "logs",
   "logLevel": "info",
