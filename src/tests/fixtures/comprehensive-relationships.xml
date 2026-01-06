@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<model xmlns="http://www.opengroup.org/xsd/archimate/3.0/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.opengroup.org/xsd/archimate/3.0/ http://www.opengroup.org/xsd/archimate/3.1/archimate3_Diagram.xsd" identifier="test-comprehensive-relationships">
+  <name xml:lang="en">Comprehensive Relationship Types Model</name>
+  <documentation xml:lang="en">Model covering various ArchiMate 3.1 relationship types</documentation>
+  <elements>
+    <element identifier="elem-1" xsi:type="BusinessActor">
+      <name xml:lang="en">Source Element</name>
+    </element>
+    <element identifier="elem-2" xsi:type="BusinessRole">
+      <name xml:lang="en">Target Element</name>
+    </element>
+    <element identifier="elem-3" xsi:type="ApplicationComponent">
+      <name xml:lang="en">Application Element</name>
+    </element>
+    <element identifier="elem-4" xsi:type="Device">
+      <name xml:lang="en">Technology Element</name>
+    </element>
+  </elements>
+  <relationships>
+    <!-- Structural Relationships -->
+    <relationship identifier="rel-comp-1" source="elem-1" target="elem-2" xsi:type="Composition">
+      <name xml:lang="en">Composition</name>
+    </relationship>
+    <relationship identifier="rel-agg-1" source="elem-1" target="elem-2" xsi:type="Aggregation">
+      <name xml:lang="en">Aggregation</name>
+    </relationship>
+    <relationship identifier="rel-assign-1" source="elem-1" target="elem-2" xsi:type="Assignment">
+      <name xml:lang="en">Assignment</name>
+    </relationship>
+    <relationship identifier="rel-real-1" source="elem-3" target="elem-1" xsi:type="Realization">
+      <name xml:lang="en">Realization</name>
+    </relationship>
+    <relationship identifier="rel-serv-1" source="elem-3" target="elem-1" xsi:type="Serving">
+      <name xml:lang="en">Serving</name>
+    </relationship>
+    <!-- Dependency Relationships -->
+    <relationship identifier="rel-acc-1" source="elem-3" target="elem-4" xsi:type="Access" accessType="Read">
+      <name xml:lang="en">Access (Read)</name>
+    </relationship>
+    <relationship identifier="rel-acc-2" source="elem-3" target="elem-4" xsi:type="Access" accessType="Write">
+      <name xml:lang="en">Access (Write)</name>
+    </relationship>
+    <relationship identifier="rel-acc-3" source="elem-3" target="elem-4" xsi:type="Access" accessType="ReadWrite">
+      <name xml:lang="en">Access (ReadWrite)</name>
+    </relationship>
+    <relationship identifier="rel-inf-1" source="elem-1" target="elem-2" xsi:type="Influence">
+      <name xml:lang="en">Influence</name>
+    </relationship>
+    <relationship identifier="rel-assoc-1" source="elem-1" target="elem-2" xsi:type="Association">
+      <name xml:lang="en">Association</name>
+    </relationship>
+    <!-- Dynamic Relationships -->
+    <relationship identifier="rel-flow-1" source="elem-1" target="elem-2" xsi:type="Flow">
+      <name xml:lang="en">Flow</name>
+    </relationship>
+    <relationship identifier="rel-trig-1" source="elem-1" target="elem-2" xsi:type="Triggering">
+      <name xml:lang="en">Triggering</name>
+    </relationship>
+    <!-- Other Relationships -->
+    <relationship identifier="rel-spec-1" source="elem-1" target="elem-2" xsi:type="Specialization">
+      <name xml:lang="en">Specialization</name>
+    </relationship>
+    <relationship identifier="rel-junc-1" source="elem-1" target="elem-2" xsi:type="Junction" junctionType="And">
+      <name xml:lang="en">Junction (And)</name>
+    </relationship>
+    <relationship identifier="rel-junc-2" source="elem-1" target="elem-2" xsi:type="Junction" junctionType="Or">
+      <name xml:lang="en">Junction (Or)</name>
+    </relationship>
+  </relationships>
+</model>

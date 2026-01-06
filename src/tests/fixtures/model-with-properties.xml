@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<model xmlns="http://www.opengroup.org/xsd/archimate/3.0/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.opengroup.org/xsd/archimate/3.0/ http://www.opengroup.org/xsd/archimate/3.1/archimate3_Diagram.xsd" identifier="test-model-properties">
+  <name xml:lang="en">Model with Properties</name>
+  <documentation xml:lang="en">Model demonstrating property definitions and property assignments</documentation>
+  <propertyDefinitions>
+    <propertyDefinition identifier="propdef-cost" type="number">
+      <name>Cost</name>
+    </propertyDefinition>
+    <propertyDefinition identifier="propdef-version" type="string">
+      <name>Version</name>
+    </propertyDefinition>
+    <propertyDefinition identifier="propdef-status" type="string">
+      <name>Status</name>
+    </propertyDefinition>
+    <propertyDefinition identifier="propdef-repository" type="string">
+      <name>Repository</name>
+    </propertyDefinition>
+  </propertyDefinitions>
+  <elements>
+    <element identifier="elem-with-props-1" xsi:type="ApplicationComponent">
+      <name xml:lang="en">Component with Properties</name>
+      <properties>
+        <property propertyDefinitionRef="propdef-cost">
+          <value xml:lang="en">50000</value>
+        </property>
+        <property propertyDefinitionRef="propdef-version">
+          <value xml:lang="en">2.0</value>
+        </property>
+        <property propertyDefinitionRef="propdef-status">
+          <value xml:lang="en">Active</value>
+        </property>
+      </properties>
+    </element>
+    <element identifier="elem-with-props-2" xsi:type="ApplicationComponent">
+      <name xml:lang="en">Another Component</name>
+      <properties>
+        <property propertyDefinitionRef="propdef-repository">
+          <value xml:lang="en">https://github.com/example/repo</value>
+        </property>
+      </properties>
+    </element>
+  </elements>
+  <relationships>
+    <relationship identifier="rel-with-props-1" source="elem-with-props-1" target="elem-with-props-2" xsi:type="Serving">
+      <name xml:lang="en">Serving Relationship</name>
+      <properties>
+        <property propertyDefinitionRef="propdef-status">
+          <value xml:lang="en">Operational</value>
+        </property>
+      </properties>
+    </relationship>
+  </relationships>
+</model>

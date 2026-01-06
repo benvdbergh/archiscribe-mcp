@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<model xmlns="http://www.opengroup.org/xsd/archimate/3.0/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.opengroup.org/xsd/archimate/3.0/ http://www.opengroup.org/xsd/archimate/3.1/archimate3_Diagram.xsd" identifier="test-basic-model">
+  <name xml:lang="en">Basic Model</name>
+  <documentation xml:lang="en">A basic model with elements and relationships for testing</documentation>
+  <elements>
+    <element identifier="elem-business-actor-1" xsi:type="BusinessActor">
+      <name xml:lang="en">Customer</name>
+      <documentation xml:lang="en">A business actor representing a customer</documentation>
+    </element>
+    <element identifier="elem-application-component-1" xsi:type="ApplicationComponent">
+      <name xml:lang="en">Customer Portal</name>
+      <documentation xml:lang="en">Web-based customer interface</documentation>
+    </element>
+    <element identifier="elem-technology-device-1" xsi:type="Device">
+      <name xml:lang="en">Web Server</name>
+      <documentation xml:lang="en">Server hosting the application</documentation>
+    </element>
+  </elements>
+  <relationships>
+    <relationship identifier="rel-serving-1" source="elem-application-component-1" target="elem-business-actor-1" xsi:type="Serving">
+      <name xml:lang="en">Serves</name>
+      <documentation xml:lang="en">Application serves the customer</documentation>
+    </relationship>
+    <relationship identifier="rel-assignment-1" source="elem-technology-device-1" target="elem-application-component-1" xsi:type="Assignment">
+      <name xml:lang="en">Hosts</name>
+    </relationship>
+  </relationships>
+</model>

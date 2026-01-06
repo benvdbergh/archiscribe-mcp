@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<model xmlns="http://www.opengroup.org/xsd/archimate/3.0/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.opengroup.org/xsd/archimate/3.0/ http://www.opengroup.org/xsd/archimate/3.1/archimate3_Diagram.xsd" identifier="test-comprehensive-elements">
+  <name xml:lang="en">Comprehensive Element Types Model</name>
+  <documentation xml:lang="en">Model covering various ArchiMate 3.1 element types across all layers</documentation>
+  <elements>
+    <!-- Business Layer -->
+    <element identifier="elem-ba-1" xsi:type="BusinessActor">
+      <name xml:lang="en">Business Actor</name>
+    </element>
+    <element identifier="elem-br-1" xsi:type="BusinessRole">
+      <name xml:lang="en">Business Role</name>
+    </element>
+    <element identifier="elem-bp-1" xsi:type="BusinessProcess">
+      <name xml:lang="en">Business Process</name>
+    </element>
+    <element identifier="elem-bf-1" xsi:type="BusinessFunction">
+      <name xml:lang="en">Business Function</name>
+    </element>
+    <element identifier="elem-bi-1" xsi:type="BusinessInteraction">
+      <name xml:lang="en">Business Interaction</name>
+    </element>
+    <element identifier="elem-bs-1" xsi:type="BusinessService">
+      <name xml:lang="en">Business Service</name>
+    </element>
+    <element identifier="elem-be-1" xsi:type="BusinessEvent">
+      <name xml:lang="en">Business Event</name>
+    </element>
+    <element identifier="elem-bco-1" xsi:type="BusinessObject">
+      <name xml:lang="en">Business Object</name>
+    </element>
+    <element identifier="elem-bc-1" xsi:type="Contract">
+      <name xml:lang="en">Contract</name>
+    </element>
+    <!-- Application Layer -->
+    <element identifier="elem-ac-1" xsi:type="ApplicationComponent">
+      <name xml:lang="en">Application Component</name>
+    </element>
+    <element identifier="elem-acoll-1" xsi:type="ApplicationCollaboration">
+      <name xml:lang="en">Application Collaboration</name>
+    </element>
+    <element identifier="elem-ai-1" xsi:type="ApplicationInterface">
+      <name xml:lang="en">Application Interface</name>
+    </element>
+    <element identifier="elem-af-1" xsi:type="ApplicationFunction">
+      <name xml:lang="en">Application Function</name>
+    </element>
+    <element identifier="elem-api-1" xsi:type="ApplicationInteraction">
+      <name xml:lang="en">Application Interaction</name>
+    </element>
+    <element identifier="elem-as-1" xsi:type="ApplicationService">
+      <name xml:lang="en">Application Service</name>
+    </element>
+    <element identifier="elem-ae-1" xsi:type="ApplicationEvent">
+      <name xml:lang="en">Application Event</name>
+    </element>
+    <element identifier="elem-ado-1" xsi:type="DataObject">
+      <name xml:lang="en">Data Object</name>
+    </element>
+    <!-- Technology Layer -->
+    <element identifier="elem-ni-1" xsi:type="Node">
+      <name xml:lang="en">Node</name>
+    </element>
+    <element identifier="elem-d-1" xsi:type="Device">
+      <name xml:lang="en">Device</name>
+    </element>
+    <element identifier="elem-syssw-1" xsi:type="SystemSoftware">
+      <name xml:lang="en">System Software</name>
+    </element>
+    <element identifier="elem-tc-1" xsi:type="TechnologyCollaboration">
+      <name xml:lang="en">Technology Collaboration</name>
+    </element>
+    <element identifier="elem-ti-1" xsi:type="TechnologyInterface">
+      <name xml:lang="en">Technology Interface</name>
+    </element>
+    <element identifier="elem-tf-1" xsi:type="TechnologyFunction">
+      <name xml:lang="en">Technology Function</name>
+    </element>
+    <element identifier="elem-tproc-1" xsi:type="Process">
+      <name xml:lang="en">Process</name>
+    </element>
+    <element identifier="elem-ts-1" xsi:type="TechnologyService">
+      <name xml:lang="en">Technology Service</name>
+    </element>
+    <element identifier="elem-te-1" xsi:type="TechnologyEvent">
+      <name xml:lang="en">Technology Event</name>
+    </element>
+    <element identifier="elem-art-1" xsi:type="Artifact">
+      <name xml:lang="en">Artifact</name>
+    </element>
+    <element identifier="elem-cn-1" xsi:type="CommunicationNetwork">
+      <name xml:lang="en">Communication Network</name>
+    </element>
+    <element identifier="elem-pl-1" xsi:type="Path">
+      <name xml:lang="en">Path</name>
+    </element>
+    <!-- Motivation Layer -->
+    <element identifier="elem-st-1" xsi:type="Stakeholder">
+      <name xml:lang="en">Stakeholder</name>
+    </element>
+    <element identifier="elem-dr-1" xsi:type="Driver">
+      <name xml:lang="en">Driver</name>
+    </element>
+    <element identifier="elem-ass-1" xsi:type="Assessment">
+      <name xml:lang="en">Assessment</name>
+    </element>
+    <element identifier="elem-go-1" xsi:type="Goal">
+      <name xml:lang="en">Goal</name>
+    </element>
+    <element identifier="elem-oc-1" xsi:type="Outcome">
+      <name xml:lang="en">Outcome</name>
+    </element>
+    <element identifier="elem-pr-1" xsi:type="Principle">
+      <name xml:lang="en">Principle</name>
+    </element>
+    <element identifier="elem-req-1" xsi:type="Requirement">
+      <name xml:lang="en">Requirement</name>
+    </element>
+    <element identifier="elem-const-1" xsi:type="Constraint">
+      <name xml:lang="en">Constraint</name>
+    </element>
+    <!-- Strategy Layer -->
+    <element identifier="elem-res-1" xsi:type="Resource">
+      <name xml:lang="en">Resource</name>
+    </element>
+    <element identifier="elem-cap-1" xsi:type="Capability">
+      <name xml:lang="en">Capability</name>
+    </element>
+    <element identifier="elem-coc-1" xsi:type="CourseOfAction">
+      <name xml:lang="en">Course of Action</name>
+    </element>
+    <element identifier="elem-val-1" xsi:type="ValueStream">
+      <name xml:lang="en">Value Stream</name>
+    </element>
+    <!-- Physical Layer -->
+    <element identifier="elem-eq-1" xsi:type="Equipment">
+      <name xml:lang="en">Equipment</name>
+    </element>
+    <element identifier="elem-fac-1" xsi:type="Facility">
+      <name xml:lang="en">Facility</name>
+    </element>
+    <element identifier="elem-mat-1" xsi:type="Material">
+      <name xml:lang="en">Material</name>
+    </element>
+    <!-- Implementation & Migration Layer -->
+    <element identifier="elem-wp-1" xsi:type="WorkPackage">
+      <name xml:lang="en">Work Package</name>
+    </element>
+    <element identifier="elem-dp-1" xsi:type="Deliverable">
+      <name xml:lang="en">Deliverable</name>
+    </element>
+    <element identifier="elem-imp-1" xsi:type="ImplementationEvent">
+      <name xml:lang="en">Implementation Event</name>
+    </element>
+    <element identifier="elem-plat-1" xsi:type="Plateau">
+      <name xml:lang="en">Plateau</name>
+    </element>
+    <element identifier="elem-gap-1" xsi:type="Gap">
+      <name xml:lang="en">Gap</name>
+    </element>
+  </elements>
+</model>

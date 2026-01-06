@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<model xmlns="http://www.opengroup.org/xsd/archimate/3.0/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.opengroup.org/xsd/archimate/3.0/ http://www.opengroup.org/xsd/archimate/3.1/archimate3_Diagram.xsd" identifier="test-model-views">
+  <name xml:lang="en">Model with Views</name>
+  <documentation xml:lang="en">Model demonstrating view structures with elements and relationships</documentation>
+  <elements>
+    <element identifier="view-elem-1" xsi:type="BusinessActor">
+      <name xml:lang="en">Customer</name>
+    </element>
+    <element identifier="view-elem-2" xsi:type="ApplicationComponent">
+      <name xml:lang="en">Customer Portal</name>
+    </element>
+    <element identifier="view-elem-3" xsi:type="ApplicationComponent">
+      <name xml:lang="en">Backend Service</name>
+    </element>
+    <element identifier="view-elem-4" xsi:type="Device">
+      <name xml:lang="en">Database Server</name>
+    </element>
+  </elements>
+  <relationships>
+    <relationship identifier="view-rel-1" source="view-elem-2" target="view-elem-1" xsi:type="Serving">
+      <name xml:lang="en">Serves Customer</name>
+    </relationship>
+    <relationship identifier="view-rel-2" source="view-elem-3" target="view-elem-2" xsi:type="Serving">
+      <name xml:lang="en">Supports Portal</name>
+    </relationship>
+    <relationship identifier="view-rel-3" source="view-elem-4" target="view-elem-3" xsi:type="Serving">
+      <name xml:lang="en">Hosts Service</name>
+    </relationship>
+  </relationships>
+  <views>
+    <diagrams>
+      <view identifier="view-1" xsi:type="Diagram">
+        <name xml:lang="en">Application Cooperation View</name>
+        <documentation xml:lang="en">View showing application components and their interactions</documentation>
+        <node identifier="node-1" elementRef="view-elem-2" xsi:type="Element">
+          <style>
+            <fillColor r="237" g="237" b="237" a="100" />
+            <lineColor r="92" g="92" b="92" a="100" />
+          </style>
+        </node>
+        <node identifier="node-2" elementRef="view-elem-3" xsi:type="Element">
+          <style>
+            <fillColor r="237" g="237" b="237" a="100" />
+            <lineColor r="92" g="92" b="92" a="100" />
+          </style>
+        </node>
+        <connection identifier="conn-1" relationshipRef="view-rel-2" xsi:type="Connection" />
+      </view>
+      <view identifier="view-2" xsi:type="Diagram">
+        <name xml:lang="en">Business Process View</name>
+        <documentation xml:lang="en">View showing business actors and application services</documentation>
+        <node identifier="node-3" elementRef="view-elem-1" xsi:type="Element" />
+        <node identifier="node-4" elementRef="view-elem-2" xsi:type="Element" />
+        <node identifier="node-5" elementRef="view-elem-3" xsi:type="Element">
+          <node identifier="node-6" elementRef="view-elem-4" xsi:type="Element" />
+        </node>
+        <connection identifier="conn-2" relationshipRef="view-rel-1" xsi:type="Connection" />
+        <connection identifier="conn-3" relationshipRef="view-rel-2" xsi:type="Connection" />
+        <connection identifier="conn-4" relationshipRef="view-rel-3" xsi:type="Connection" />
+      </view>
+    </diagrams>
+  </views>
+</model>
