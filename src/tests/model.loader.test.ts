@@ -155,7 +155,8 @@ describe('ModelLoader', () => {
       expect(model).toEqual({
         views: [],
         elements: [],
-        relationships: []
+        relationships: [],
+        propertyDefinitions: []
       });
     });
   });
