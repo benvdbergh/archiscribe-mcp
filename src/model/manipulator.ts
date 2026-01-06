@@ -33,6 +33,7 @@ import { getLogger } from '../utils/logger';
 import { ArchiMateXMLBuilder } from './persistence';
 import { writeFileSync, copyFileSync, existsSync, mkdirSync } from 'fs';
 import { dirname, join, basename, extname } from 'path';
+import { getErrorCode, createDetailedError } from '../utils/error-codes';
 
 const logger = getLogger();
 
@@ -114,17 +115,20 @@ export class ModelManipulator {
   async createElement(data: CreateElementInput): Promise<ElementObject> {
     // Validate required fields
     if (!data.name || data.name.trim() === '') {
-      throw new ValidationError('Element name is required', { valid: false, errors: [{ message: 'Element name is required' }] });
+      const errorDef = getErrorCode('ELEMENT_NAME_REQUIRED');
+      throw new ValidationError('Element name is required', { valid: false, errors: [{ message: 'Element name is required' }] }, undefined, errorDef?.suggestions, { operation: 'createElement' });
     }
 
     if (!data.type || data.type.trim() === '') {
-      throw new ValidationError('Element type is required', { valid: false, errors: [{ message: 'Element type is required' }] });
+      const errorDef = getErrorCode('ELEMENT_TYPE_INVALID');
+      throw new ValidationError('Element type is required', { valid: false, errors: [{ message: 'Element type is required' }] }, undefined, errorDef?.suggestions, { operation: 'createElement' });
     }
 
     // Validate element type against ArchiMate 3.1 specification
     const validationResult = await this.validateElementType(data.type);
     if (!validationResult.valid) {
-      throw new ValidationError(`Invalid element type: ${data.type}`, validationResult);
+      const errorDef = getErrorCode('ELEMENT_TYPE_INVALID');
+      throw new ValidationError(`Invalid element type: ${data.type}`, validationResult, undefined, errorDef?.suggestions, { operation: 'createElement', elementType: data.type });
     }
 
     // Generate identifier if not provided
@@ -135,7 +139,8 @@ export class ModelManipulator {
 
     // Check for duplicate identifier
     if (this.identifierExists(identifier)) {
-      throw new DuplicateError('element', identifier);
+      const errorDef = getErrorCode('ELEMENT_DUPLICATE');
+      throw new DuplicateError('element', identifier, errorDef?.suggestions, { operation: 'createElement', identifier });
     }
 
     // Create element object
@@ -335,19 +340,28 @@ export class ModelManipulator {
     // Validate relationship type
     const typeValidation = await this.validateRelationshipType(data.type);
     if (!typeValidation.valid) {
-      throw new ValidationError(`Invalid relationship type: ${data.type}`, typeValidation);
+      const errorDef = getErrorCode('RELATIONSHIP_TYPE_INVALID');
+      throw new ValidationError(
+        `Invalid relationship type: ${data.type}`,
+        typeValidation,
+        undefined,
+        errorDef?.suggestions,
+        { operation: 'createRelationship', relationshipType: data.type }
+      );
     }
 
     // Validate source element exists
     const sourceElement = this.getElement(data.sourceId);
     if (!sourceElement) {
-      throw new NotFoundError('element', data.sourceId);
+      const errorDef = getErrorCode('RELATIONSHIP_SOURCE_NOT_FOUND');
+      throw new NotFoundError('element', data.sourceId, errorDef?.suggestions, { operation: 'createRelationship', sourceId: data.sourceId });
     }
 
     // Validate target element exists
     const targetElement = this.getElement(data.targetId);
     if (!targetElement) {
-      throw new NotFoundError('element', data.targetId);
+      const errorDef = getErrorCode('RELATIONSHIP_TARGET_NOT_FOUND');
+      throw new NotFoundError('element', data.targetId, errorDef?.suggestions, { operation: 'createRelationship', targetId: data.targetId });
     }
 
     // Validate source and target are different

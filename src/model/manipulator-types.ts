@@ -165,21 +165,39 @@ export class ModelManipulationError extends Error {
   code: string;
   entityId?: string;
   details?: any;
+  suggestions?: string[];
+  context?: Record<string, any>;
 
-  constructor(message: string, code: string, entityId?: string, details?: any) {
+  constructor(message: string, code: string, entityId?: string, details?: any, suggestions?: string[], context?: Record<string, any>) {
     super(message);
     this.name = 'ModelManipulationError';
     this.code = code;
     this.entityId = entityId;
     this.details = details;
+    this.suggestions = suggestions;
+    this.context = context;
+  }
+
+  /**
+   * Get detailed error information
+   */
+  toDetailedError() {
+    return {
+      code: this.code,
+      message: this.message,
+      entityId: this.entityId,
+      suggestions: this.suggestions || [],
+      context: this.context,
+      details: this.details
+    };
   }
 }
 
 export class ValidationError extends ModelManipulationError {
   validationResult: any;
 
-  constructor(message: string, validationResult: any, entityId?: string) {
-    super(message, 'VALIDATION_ERROR', entityId, validationResult);
+  constructor(message: string, validationResult: any, entityId?: string, suggestions?: string[], context?: Record<string, any>) {
+    super(message, 'VALIDATION_FAILED', entityId, validationResult, suggestions, context);
     this.name = 'ValidationError';
     this.validationResult = validationResult;
   }
@@ -188,8 +206,11 @@ export class ValidationError extends ModelManipulationError {
 export class NotFoundError extends ModelManipulationError {
   entityType: string;
 
-  constructor(entityType: string, entityId: string) {
-    super(`${entityType} not found: ${entityId}`, 'NOT_FOUND', entityId);
+  constructor(entityType: string, entityId: string, suggestions?: string[], context?: Record<string, any>) {
+    const code = entityType.toUpperCase() === 'ELEMENT' ? 'ELEMENT_NOT_FOUND' :
+                 entityType.toUpperCase() === 'RELATIONSHIP' ? 'RELATIONSHIP_NOT_FOUND' :
+                 entityType.toUpperCase() === 'VIEW' ? 'VIEW_NOT_FOUND' : 'NOT_FOUND';
+    super(`${entityType} not found: ${entityId}`, code, entityId, undefined, suggestions, { ...context, entityType });
     this.name = 'NotFoundError';
     this.entityType = entityType;
   }
@@ -198,8 +219,11 @@ export class NotFoundError extends ModelManipulationError {
 export class DuplicateError extends ModelManipulationError {
   entityType: string;
 
-  constructor(entityType: string, entityId: string) {
-    super(`Duplicate ${entityType}: ${entityId}`, 'DUPLICATE', entityId);
+  constructor(entityType: string, entityId: string, suggestions?: string[], context?: Record<string, any>) {
+    const code = entityType.toUpperCase() === 'ELEMENT' ? 'ELEMENT_DUPLICATE' :
+                 entityType.toUpperCase() === 'RELATIONSHIP' ? 'RELATIONSHIP_DUPLICATE' :
+                 entityType.toUpperCase() === 'VIEW' ? 'VIEW_DUPLICATE' : 'DUPLICATE';
+    super(`Duplicate ${entityType}: ${entityId}`, code, entityId, undefined, suggestions, { ...context, entityType });
     this.name = 'DuplicateError';
     this.entityType = entityType;
   }
@@ -209,12 +233,14 @@ export class ReferentialIntegrityError extends ModelManipulationError {
   entityType: string;
   dependentEntities: string[];
 
-  constructor(entityType: string, entityId: string, dependentEntities: string[]) {
+  constructor(entityType: string, entityId: string, dependentEntities: string[], suggestions?: string[], context?: Record<string, any>) {
     super(
       `Cannot delete ${entityType} ${entityId}: has dependent entities`,
-      'REFERENTIAL_INTEGRITY',
+      'REFERENTIAL_INTEGRITY_VIOLATION',
       entityId,
-      { dependentEntities }
+      { dependentEntities },
+      suggestions,
+      { ...context, entityType, dependentEntities }
     );
     this.name = 'ReferentialIntegrityError';
     this.entityType = entityType;
