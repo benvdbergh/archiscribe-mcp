@@ -26,8 +26,13 @@ import {
   ValidationResult,
   Operation
 } from './manipulator-types';
-import { XSDValidator } from '../utils/xsd-validator';
+import { XSDValidator, ValidationError as XSDValidationError } from '../utils/xsd-validator';
+import { BusinessRulesValidator } from '../utils/business-rules-validator';
+import { ValidationReporter, ValidationReport } from '../utils/validation-reporter';
 import { getLogger } from '../utils/logger';
+import { ArchiMateXMLBuilder } from './persistence';
+import { writeFileSync, copyFileSync, existsSync, mkdirSync } from 'fs';
+import { dirname, join, basename, extname } from 'path';
 
 const logger = getLogger();
 
@@ -64,13 +69,17 @@ export class ModelTransaction {
 export class ModelManipulator {
   private loader: ModelLoader;
   private validator?: XSDValidator;
+  private businessRulesValidator: BusinessRulesValidator;
   private model: ModelData;
   private modified: boolean = false;
+  private xmlBuilder: ArchiMateXMLBuilder;
 
   constructor(loader: ModelLoader, validator?: XSDValidator) {
     this.loader = loader;
     this.validator = validator;
+    this.businessRulesValidator = new BusinessRulesValidator();
     this.model = loader.load();
+    this.xmlBuilder = new ArchiMateXMLBuilder();
   }
 
   /**
@@ -1249,33 +1258,417 @@ export class ModelManipulator {
   // ============================================================================
 
   /**
+   * Generate comprehensive validation report
+   * 
+   * Creates a detailed validation report with errors, warnings, suggestions,
+   * and multiple output format options.
+   * 
+   * @param format Output format: 'json', 'markdown', or 'text'
+   */
+  async generateValidationReport(format: 'json' | 'markdown' | 'text' = 'json'): Promise<string> {
+    const reporter = new ValidationReporter();
+    
+    // Run comprehensive validation
+    const validationResult = await this.validateModel();
+    
+    // Create report (for now, we combine all validation into one result)
+    // In the future, we could separate XSD, business rules, and referential integrity
+    const report: ValidationReport = reporter.createReport(
+      validationResult, // XSD result
+      validationResult, // Business rules result (same for now)
+      validationResult  // Referential integrity result (same for now)
+    );
+
+    // Format report
+    switch (format) {
+      case 'json':
+        return reporter.toJSON(report, true);
+      case 'markdown':
+        return reporter.toMarkdown(report);
+      case 'text':
+        return reporter.toText(report);
+      default:
+        return reporter.toJSON(report, true);
+    }
+  }
+
+  /**
    * Validate the entire model
+   * 
+   * Comprehensive validation including:
+   * - XSD schema validation (if validator available)
+   * - Referential integrity validation
+   * - Business rules validation (relationship compatibility, cardinality)
+   * - Element and relationship type validation
+   * - View integrity validation
    */
   async validateModel(): Promise<ValidationResult> {
-    if (!this.validator) {
-      return { valid: true, errors: [] };
+    const errors: XSDValidationError[] = [];
+
+    // 1. XSD Schema Validation
+    if (this.validator) {
+      try {
+        const xml = this.xmlBuilder.serialize(this.model);
+        const xsdResult = this.validator.validateModel(xml);
+        
+        if (!xsdResult.valid) {
+          errors.push(...xsdResult.errors);
+        }
+      } catch (error) {
+        const err = error as Error;
+        errors.push({
+          message: `XSD validation error: ${err.message}`,
+          path: 'model'
+        });
+      }
     }
 
-    // TODO: Serialize model to XML and validate
-    // This will be implemented when XML builder is ready (Story-1-3)
-    logger.log('info', 'model.validation', {});
-    return { valid: true, errors: [] };
+    // 2. Referential Integrity Validation
+    // Check identifier uniqueness
+    const allIds: string[] = [];
+    for (const element of this.model.elements) {
+      if (allIds.includes(element.id)) {
+        errors.push({
+          message: `Duplicate element identifier: ${element.id}`,
+          path: `element[${element.id}]`
+        });
+      }
+      allIds.push(element.id);
+    }
+
+    for (const relationship of this.model.relationships) {
+      if (allIds.includes(relationship.id)) {
+        errors.push({
+          message: `Duplicate relationship identifier: ${relationship.id}`,
+          path: `relationship[${relationship.id}]`
+        });
+      }
+      allIds.push(relationship.id);
+    }
+
+    for (const view of this.model.views) {
+      if (allIds.includes(view.id)) {
+        errors.push({
+          message: `Duplicate view identifier: ${view.id}`,
+          path: `view[${view.id}]`
+        });
+      }
+      allIds.push(view.id);
+    }
+
+    // Check relationship references
+    for (const relationship of this.model.relationships) {
+      const sourceExists = this.model.elements.some(e => e.id === relationship.sourceId);
+      const targetExists = this.model.elements.some(e => e.id === relationship.targetId);
+      
+      if (!sourceExists) {
+        errors.push({
+          message: `Relationship source element not found: ${relationship.sourceId}`,
+          path: `relationship[${relationship.id}].sourceId`
+        });
+      }
+      if (!targetExists) {
+        errors.push({
+          message: `Relationship target element not found: ${relationship.targetId}`,
+          path: `relationship[${relationship.id}].targetId`
+        });
+      }
+    }
+
+    // 3. Business Rules Validation
+    // Validate each relationship
+    for (const relationship of this.model.relationships) {
+      const sourceElement = this.model.elements.find(e => e.id === relationship.sourceId);
+      const targetElement = this.model.elements.find(e => e.id === relationship.targetId);
+      
+      if (sourceElement && targetElement && relationship.type) {
+        const businessRulesResult = this.businessRulesValidator.validateRelationship(
+          relationship,
+          sourceElement,
+          targetElement,
+          this.model.relationships
+        );
+        errors.push(...businessRulesResult.errors);
+      }
+    }
+
+    // Validate each element type
+    for (const element of this.model.elements) {
+      if (element.type) {
+        const typeValidation = this.businessRulesValidator.validateElementType(element.type);
+        if (!typeValidation.valid) {
+          errors.push(...typeValidation.errors.map(e => ({
+            ...e,
+            path: `element[${element.id}].type`
+          })));
+        }
+      }
+    }
+
+    // 4. View Integrity Validation
+    for (const view of this.model.views) {
+      const viewResult = this.businessRulesValidator.validateViewIntegrity(
+        view,
+        this.model.elements,
+        this.model.relationships
+      );
+      errors.push(...viewResult.errors);
+    }
+
+    // 5. Property Definition References
+    if (this.model.propertyDefinitions) {
+      const propDefIds = new Set(this.model.propertyDefinitions.map(pd => pd.identifier));
+      
+      // Check element properties
+      for (const element of this.model.elements) {
+        if (element.properties) {
+          for (const propDefId of Object.keys(element.properties)) {
+            if (!propDefIds.has(propDefId)) {
+              errors.push({
+                message: `Property definition not found: ${propDefId}`,
+                path: `element[${element.id}].properties[${propDefId}]`
+              });
+            }
+          }
+        }
+      }
+
+      // Check relationship properties
+      for (const relationship of this.model.relationships) {
+        if (relationship.properties) {
+          for (const propDefId of Object.keys(relationship.properties)) {
+            if (!propDefIds.has(propDefId)) {
+              errors.push({
+                message: `Property definition not found: ${propDefId}`,
+                path: `relationship[${relationship.id}].properties[${propDefId}]`
+              });
+            }
+          }
+        }
+      }
+
+      // Check view properties
+      for (const view of this.model.views) {
+        if (view.properties) {
+          for (const propDefId of Object.keys(view.properties)) {
+            if (!propDefIds.has(propDefId)) {
+              errors.push({
+                message: `Property definition not found: ${propDefId}`,
+                path: `view[${view.id}].properties[${propDefId}]`
+              });
+            }
+          }
+        }
+      }
+    }
+
+    const isValid = errors.length === 0;
+
+    if (isValid) {
+      logger.log('info', 'model.validation.success', {
+        elements: this.model.elements.length,
+        relationships: this.model.relationships.length,
+        views: this.model.views.length
+      });
+    } else {
+      logger.log('warn', 'model.validation.failed', {
+        errorCount: errors.length
+      });
+    }
+
+    return {
+      valid: isValid,
+      errors
+    };
   }
 
   /**
    * Validate a single element
+   * 
+   * Validates element against:
+   * - Required fields
+   * - Element type (business rules)
+   * - XSD schema (if validator available)
    */
   async validateElement(element: ElementObject): Promise<ValidationResult> {
-    // TODO: Implement element validation
-    return { valid: true, errors: [] };
+    const errors: XSDValidationError[] = [];
+
+    // Basic validation: required fields
+    if (!element.name || element.name.trim() === '') {
+      errors.push({
+        message: 'Element name is required',
+        path: `element[${element.id}]`
+      });
+    }
+
+    if (!element.type) {
+      errors.push({
+        message: 'Element type is required',
+        path: `element[${element.id}]`
+      });
+    } else {
+      // Validate element type using business rules
+      const typeValidation = this.businessRulesValidator.validateElementType(element.type);
+      if (!typeValidation.valid) {
+        errors.push(...typeValidation.errors.map(e => ({
+          ...e,
+          path: `element[${element.id}].type`
+        })));
+      }
+    }
+
+    // XSD validation: create minimal model with this element
+    if (this.validator) {
+      try {
+        const minimalModel: ModelData = {
+          elements: [element],
+          relationships: [],
+          views: []
+        };
+        const xml = this.xmlBuilder.serialize(minimalModel);
+        const xsdResult = this.validator.validateModel(xml);
+        
+        if (!xsdResult.valid) {
+          // Filter errors related to this element
+          const elementErrors = xsdResult.errors.filter(err => 
+            !err.path || err.path.includes(element.id) || err.path.includes('element')
+          );
+          errors.push(...elementErrors.map(e => ({
+            ...e,
+            path: e.path || `element[${element.id}]`
+          })));
+        }
+      } catch (error) {
+        const err = error as Error;
+        errors.push({
+          message: `XSD validation error: ${err.message}`,
+          path: `element[${element.id}]`
+        });
+      }
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors
+    };
   }
 
   /**
    * Validate a single relationship
+   * 
+   * Validates relationship against:
+   * - Required fields
+   * - Referential integrity (source/target exist)
+   * - Relationship type (business rules)
+   * - Relationship compatibility (business rules)
+   * - Relationship cardinality (business rules)
+   * - XSD schema (if validator available)
    */
   async validateRelationship(rel: RelationshipObject): Promise<ValidationResult> {
-    // TODO: Implement relationship validation
-    return { valid: true, errors: [] };
+    const errors: XSDValidationError[] = [];
+
+    // Basic validation: required fields
+    if (!rel.type) {
+      errors.push({
+        message: 'Relationship type is required',
+        path: `relationship[${rel.id}]`
+      });
+    } else {
+      // Validate relationship type
+      const typeValidation = await this.validateRelationshipType(rel.type);
+      if (!typeValidation.valid) {
+        errors.push(...typeValidation.errors.map(e => ({
+          ...e,
+          path: `relationship[${rel.id}].type`
+        })));
+      }
+    }
+
+    if (!rel.sourceId) {
+      errors.push({
+        message: 'Source element ID is required',
+        path: `relationship[${rel.id}].sourceId`
+      });
+    }
+
+    if (!rel.targetId) {
+      errors.push({
+        message: 'Target element ID is required',
+        path: `relationship[${rel.id}].targetId`
+      });
+    }
+
+    // Validate source and target are different
+    if (rel.sourceId && rel.targetId && rel.sourceId === rel.targetId) {
+      errors.push({
+        message: 'Source and target elements must be different',
+        path: `relationship[${rel.id}]`
+      });
+    }
+
+    // Validate source and target elements exist in the model (referential integrity)
+    const sourceElement = rel.sourceId ? this.model.elements.find(e => e.id === rel.sourceId) : null;
+    const targetElement = rel.targetId ? this.model.elements.find(e => e.id === rel.targetId) : null;
+
+    if (rel.sourceId && !sourceElement) {
+      errors.push({
+        message: `Source element not found: ${rel.sourceId}`,
+        path: `relationship[${rel.id}].sourceId`
+      });
+    }
+
+    if (rel.targetId && !targetElement) {
+      errors.push({
+        message: `Target element not found: ${rel.targetId}`,
+        path: `relationship[${rel.id}].targetId`
+      });
+    }
+
+    // Business rules validation: compatibility and cardinality
+    if (sourceElement && targetElement && rel.type) {
+      const businessRulesResult = this.businessRulesValidator.validateRelationship(
+        rel,
+        sourceElement,
+        targetElement,
+        this.model.relationships
+      );
+      errors.push(...businessRulesResult.errors);
+    }
+
+    // XSD validation: create minimal model with this relationship and its source/target elements
+    if (this.validator && sourceElement && targetElement) {
+      try {
+        const minimalModel: ModelData = {
+          elements: [sourceElement, targetElement],
+          relationships: [rel],
+          views: []
+        };
+        const xml = this.xmlBuilder.serialize(minimalModel);
+        const xsdResult = this.validator.validateModel(xml);
+        
+        if (!xsdResult.valid) {
+          // Filter errors related to this relationship
+          const relErrors = xsdResult.errors.filter(err => 
+            !err.path || err.path.includes(rel.id) || err.path.includes('relationship')
+          );
+          errors.push(...relErrors.map(e => ({
+            ...e,
+            path: e.path || `relationship[${rel.id}]`
+          })));
+        }
+      } catch (error) {
+        const err = error as Error;
+        errors.push({
+          message: `XSD validation error: ${err.message}`,
+          path: `relationship[${rel.id}]`
+        });
+      }
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors
+    };
   }
 
   // ============================================================================
@@ -1283,19 +1676,172 @@ export class ModelManipulator {
   // ============================================================================
 
   /**
-   * Save model to file
+   * Create a backup of the model file
    */
-  async save(path?: string): Promise<void> {
-    // TODO: Implement in Story-2-6 (Model Persistence)
-    throw new Error('Not implemented: save');
+  private createBackup(sourcePath: string): string {
+    const dir = dirname(sourcePath);
+    const filename = basename(sourcePath, extname(sourcePath));
+    const extension = extname(sourcePath) || '.xml';
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const backupPath = join(dir, `${filename}.backup.${timestamp}${extension}`);
+
+    if (existsSync(sourcePath)) {
+      copyFileSync(sourcePath, backupPath);
+      logger.log('info', 'model.backup.created', { sourcePath, backupPath });
+    }
+
+    return backupPath;
+  }
+
+  /**
+   * Validate model before saving
+   */
+  private async validateBeforeSave(): Promise<void> {
+    // Basic validation: check for required fields and referential integrity
+    const validationResult = await this.validateModel();
+    if (!validationResult.valid) {
+      const errors = validationResult.errors.map(e => e.message).join('; ');
+      throw new ValidationError(
+        `Model validation failed before save: ${errors}`,
+        validationResult
+      );
+    }
+
+    // Additional validation: check identifier uniqueness
+    const allIds: string[] = [];
+    for (const element of this.model.elements) {
+      if (allIds.includes(element.id)) {
+        throw new DuplicateError('element', element.id);
+      }
+      allIds.push(element.id);
+    }
+
+    for (const relationship of this.model.relationships) {
+      if (allIds.includes(relationship.id)) {
+        throw new DuplicateError('relationship', relationship.id);
+      }
+      allIds.push(relationship.id);
+    }
+
+    for (const view of this.model.views) {
+      if (allIds.includes(view.id)) {
+        throw new DuplicateError('view', view.id);
+      }
+      allIds.push(view.id);
+    }
+
+    // Check referential integrity: relationships must reference existing elements
+    for (const relationship of this.model.relationships) {
+      const sourceExists = this.model.elements.some(e => e.id === relationship.sourceId);
+      const targetExists = this.model.elements.some(e => e.id === relationship.targetId);
+      
+      if (!sourceExists) {
+        throw new ReferentialIntegrityError(
+          'relationship',
+          relationship.id,
+          [`Source element not found: ${relationship.sourceId}`]
+        );
+      }
+      if (!targetExists) {
+        throw new ReferentialIntegrityError(
+          'relationship',
+          relationship.id,
+          [`Target element not found: ${relationship.targetId}`]
+        );
+      }
+    }
+
+    // Check view references
+    for (const view of this.model.views) {
+      if (view.elements) {
+        for (const elementId of view.elements) {
+          const elementExists = this.model.elements.some(e => e.id === elementId);
+          if (!elementExists) {
+            throw new ReferentialIntegrityError(
+              'view',
+              view.id,
+              [`Element not found in view: ${elementId}`]
+            );
+          }
+        }
+      }
+      if (view.relationships) {
+        for (const relId of view.relationships) {
+          const relExists = this.model.relationships.some(r => r.id === relId);
+          if (!relExists) {
+            throw new ReferentialIntegrityError(
+              'view',
+              view.id,
+              [`Relationship not found in view: ${relId}`]
+            );
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Save model to file
+   * 
+   * @param path Optional path to save to (defaults to original file path)
+   * @param options Optional save options
+   */
+  async save(path?: string, options?: { createBackup?: boolean; validate?: boolean }): Promise<void> {
+    const opts = { createBackup: true, validate: true, ...options };
+    const targetPath = path || this.loader.getPath();
+
+    if (!targetPath) {
+      throw new Error('No file path specified. Use saveAs() to save to a new file.');
+    }
+
+    // Validate before save if requested
+    if (opts.validate) {
+      await this.validateBeforeSave();
+    }
+
+    // Create backup if requested and file exists
+    if (opts.createBackup && existsSync(targetPath)) {
+      this.createBackup(targetPath);
+    }
+
+    // Serialize model to XML
+    // Note: ModelData doesn't store model-level identifier/name, so we'll use defaults
+    const xml = this.xmlBuilder.serialize(this.model);
+
+    // Ensure directory exists
+    const dir = dirname(targetPath);
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
+
+    // Write to file
+    writeFileSync(targetPath, xml, 'utf8');
+
+    // Clear modified flag
+    this.modified = false;
+
+    // Invalidate loader cache
+    this.loader.reload();
+
+    logger.log('info', 'model.save.success', { path: targetPath });
   }
 
   /**
    * Save model to a new file
+   * 
+   * @param path Path to save the model to
+   * @param options Optional save options
    */
-  async saveAs(path: string): Promise<void> {
-    // TODO: Implement in Story-2-6 (Model Persistence)
-    throw new Error('Not implemented: saveAs');
+  async saveAs(path: string, options?: { createBackup?: boolean; validate?: boolean }): Promise<void> {
+    if (!path || path.trim() === '') {
+      throw new ValidationError('Path is required for saveAs', {
+        valid: false,
+        errors: [{ message: 'Path is required for saveAs' }]
+      });
+    }
+
+    await this.save(path, options);
+    logger.log('info', 'model.saveAs.success', { path });
   }
 
   // ============================================================================
