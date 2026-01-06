@@ -83,14 +83,14 @@ export class ArchiMateXMLBuilder {
     }
 
     // Add property definitions
-    // Note: Property definitions need to be extracted from elements/relationships/views
-    // For now, we'll collect them from the model
-    const propertyDefs = this.collectPropertyDefinitions(model);
-    if (propertyDefs.size > 0) {
+    if (model.propertyDefinitions && model.propertyDefinitions.length > 0) {
       const propDefsEl = root.ele('propertyDefinitions');
-      for (const [id, name] of propertyDefs.entries()) {
-        const propDefEl = propDefsEl.ele('propertyDefinition', { identifier: id, type: 'string' });
-        propDefEl.ele('name').txt(name);
+      for (const propDef of model.propertyDefinitions) {
+        const propDefEl = propDefsEl.ele('propertyDefinition', { 
+          identifier: propDef.identifier, 
+          type: propDef.type || 'string' 
+        });
+        this.addLangString(propDefEl, 'name', propDef.name, lang);
       }
     }
 
@@ -255,50 +255,6 @@ export class ArchiMateXMLBuilder {
     el.txt(value);
   }
 
-  /**
-   * Collect property definitions from model
-   * 
-   * Note: This is a simplified version. Full implementation needs to track
-   * property definitions separately in the model structure.
-   */
-  private collectPropertyDefinitions(model: ModelData): Map<string, string> {
-    const propDefs = new Map<string, string>();
-
-    // Collect from elements
-    for (const element of model.elements || []) {
-      if (element.properties) {
-        for (const key of Object.keys(element.properties)) {
-          if (!propDefs.has(key)) {
-            propDefs.set(key, key); // Use key as name if not defined
-          }
-        }
-      }
-    }
-
-    // Collect from relationships
-    for (const rel of model.relationships || []) {
-      if (rel.properties) {
-        for (const key of Object.keys(rel.properties)) {
-          if (!propDefs.has(key)) {
-            propDefs.set(key, key);
-          }
-        }
-      }
-    }
-
-    // Collect from views
-    for (const view of model.views || []) {
-      if (view.properties) {
-        for (const key of Object.keys(view.properties)) {
-          if (!propDefs.has(key)) {
-            propDefs.set(key, key);
-          }
-        }
-      }
-    }
-
-    return propDefs;
-  }
 
   /**
    * Generate a model identifier

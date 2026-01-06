@@ -59,11 +59,18 @@ export class ModelLoader {
       const relationships = this.parseRelationships(model, propDefs);
       const views = this.parseViews(model, propDefs);
 
-      this.cache = { views, elements, relationships } as ModelData;
+      // Convert property definitions Map to array for storage
+      const propertyDefinitions = Array.from(propDefs.entries()).map(([id, name]) => ({
+        identifier: id,
+        name: name,
+        type: 'string' // Default type, could be parsed from XML if needed
+      }));
+
+      this.cache = { views, elements, relationships, propertyDefinitions } as ModelData;
       logger.log('info', 'model.load.success', { path: this.path, views: views.length, elements: elements.length, relationships: relationships.length });
       return this.cache;
     } catch (err) {
-      this.cache = { views: [], elements: [], relationships: [] };
+      this.cache = { views: [], elements: [], relationships: [], propertyDefinitions: [] };
       logger.log('warn', 'model.load.fail', { path: this.path, error: (err as Error)?.message || String(err) });
       return this.cache;
     }
@@ -96,9 +103,10 @@ export class ModelLoader {
     for (const p of propsRaw) {
       const ref = attr(p, 'propertyDefinitionRef');
       const val = p.value ? (typeof p.value === 'string' ? p.value : p.value['#text']) : undefined;
-      if (ref) {
-        const pname = propDefs.get(ref) || ref;
-        if (val !== undefined) props[pname] = val;
+      if (ref && val !== undefined) {
+        // Store property using property definition ID as key (not name)
+        // This ensures consistency with XML format where propertyDefinitionRef is used
+        props[ref] = val;
       }
     }
     return props;

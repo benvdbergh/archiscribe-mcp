@@ -35,4 +35,5 @@ export interface ModelData {
   views: ViewObject[];
   elements: ElementObject[];
   relationships: RelationshipObject[];
+  propertyDefinitions?: Array<{ identifier: string; name: string; type?: string }>;
 }
