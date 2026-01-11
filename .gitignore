@@ -5,3 +5,4 @@ dist/
 *.archimate
 *.archimate.bak
 /logs/
+src/tests/fixtures/temp/*.backup.*.xml
