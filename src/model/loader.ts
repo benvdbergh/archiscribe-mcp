@@ -37,6 +37,17 @@ export class ModelLoader {
     return this.path;
   }
 
+  /**
+   * Set a new file path for this loader
+   * Clears cache and reinitializes file watcher
+   */
+  setPath(newPath: string): void {
+    this.path = newPath;
+    this.cache = undefined;
+    this.watcherInitialized = false;
+    this.initWatcher();
+  }
+
   private initWatcher() {
     if (this.watcherInitialized) return;
     try {

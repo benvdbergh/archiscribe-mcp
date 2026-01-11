@@ -15,6 +15,9 @@ import {
   ValidationResult
 } from '../model/manipulator-types';
 import { ValidationReporter } from '../utils/validation-reporter';
+import { validateModelPath, validatePath } from '../utils/path-validator';
+import { existsSync, writeFileSync, mkdirSync } from 'fs';
+import { dirname } from 'path';
 
 export interface SearchViewsInput {
   query?: string;
@@ -65,6 +68,7 @@ export interface CreateElementInput {
   identifier?: string;
   documentation?: string;
   properties?: Record<string, string>;
+  autoSave?: boolean;
 }
 
 export interface CreateElementOutput {
@@ -79,6 +83,7 @@ export interface UpdateElementInput {
   type?: string;
   documentation?: string;
   properties?: Record<string, string>;
+  autoSave?: boolean;
 }
 
 export interface UpdateElementOutput {
@@ -90,6 +95,7 @@ export interface UpdateElementOutput {
 export interface DeleteElementInput {
   identifier: string;
   cascade?: boolean;
+  autoSave?: boolean;
 }
 
 export interface DeleteElementOutput {
@@ -110,6 +116,7 @@ export interface CreateRelationshipInput {
   name?: string;
   documentation?: string;
   properties?: Record<string, string>;
+  autoSave?: boolean;
 }
 
 export interface CreateRelationshipOutput {
@@ -126,6 +133,7 @@ export interface UpdateRelationshipInput {
   name?: string;
   documentation?: string;
   properties?: Record<string, string>;
+  autoSave?: boolean;
 }
 
 export interface UpdateRelationshipOutput {
@@ -136,6 +144,7 @@ export interface UpdateRelationshipOutput {
 
 export interface DeleteRelationshipInput {
   identifier: string;
+  autoSave?: boolean;
 }
 
 export interface DeleteRelationshipOutput {
@@ -158,6 +167,7 @@ export interface CreateViewInput {
   elements?: string[];
   relationships?: string[];
   nodeHierarchy?: Array<{ parentElement: string; childElement: string }>;
+  autoSave?: boolean;
 }
 
 export interface CreateViewOutput {
@@ -176,6 +186,7 @@ export interface UpdateViewInput {
   elements?: string[];
   relationships?: string[];
   nodeHierarchy?: Array<{ parentElement: string; childElement: string }>;
+  autoSave?: boolean;
 }
 
 export interface UpdateViewOutput {
@@ -188,6 +199,7 @@ export interface AddElementToViewInput {
   viewId: string;
   elementId: string;
   parentElementId?: string;
+  autoSave?: boolean;
 }
 
 export interface AddElementToViewOutput {
@@ -199,6 +211,7 @@ export interface AddElementToViewOutput {
 export interface RemoveElementFromViewInput {
   viewId: string;
   elementId: string;
+  autoSave?: boolean;
 }
 
 export interface RemoveElementFromViewOutput {
@@ -209,6 +222,7 @@ export interface RemoveElementFromViewOutput {
 
 export interface DeleteViewInput {
   identifier: string;
+  autoSave?: boolean;
 }
 
 export interface DeleteViewOutput {
@@ -279,6 +293,39 @@ export interface GetModelPathInput {
 export interface GetModelPathOutput {
   path: string;
   modified: boolean;
+  markdown: string;
+  [key: string]: unknown;
+}
+
+export interface SetModelPathInput {
+  path: string;
+}
+
+export interface SetModelPathOutput {
+  success: boolean;
+  modelPath: string;
+  elementCount: number;
+  viewCount: number;
+  hasUnsavedChanges: boolean;
+  warning?: string;
+  markdown: string;
+  [key: string]: unknown;
+}
+
+export interface CreateModelInput {
+  path: string;
+  name?: string;
+  identifier?: string;
+}
+
+export interface CreateModelOutput {
+  success: boolean;
+  modelPath: string;
+  elementCount: number;
+  viewCount: number;
+  relationshipCount: number;
+  hasUnsavedChanges: boolean;
+  message: string;
   markdown: string;
   [key: string]: unknown;
 }
@@ -364,6 +411,31 @@ function createGetModelPathOutput(path: string, modified: boolean, markdown: str
   return { path, modified, markdown };
 }
 
+function createSetModelPathOutput(
+  success: boolean,
+  modelPath: string,
+  elementCount: number,
+  viewCount: number,
+  hasUnsavedChanges: boolean,
+  markdown: string,
+  warning?: string
+): SetModelPathOutput {
+  return { success, modelPath, elementCount, viewCount, hasUnsavedChanges, markdown, warning };
+}
+
+function createCreateModelOutput(
+  success: boolean,
+  modelPath: string,
+  elementCount: number,
+  viewCount: number,
+  relationshipCount: number,
+  hasUnsavedChanges: boolean,
+  message: string,
+  markdown: string
+): CreateModelOutput {
+  return { success, modelPath, elementCount, viewCount, relationshipCount, hasUnsavedChanges, message, markdown };
+}
+
 export function createTools(modelPath?: string) {
   const cfg = loadConfig();
   const loader = new ModelLoader(modelPath || cfg.modelPath);
@@ -383,6 +455,29 @@ export function createTools(modelPath?: string) {
   function withDisclaimer(md: string): string {
     if (!md) return DISCLAIMER_PREFIX;
     return md.startsWith(DISCLAIMER_PREFIX) ? md : DISCLAIMER_PREFIX + md;
+  }
+
+  // Helper function to handle auto-save after CRUD operations
+  async function handleAutoSave(autoSave: boolean | undefined, operationResult: any): Promise<{ saveResult?: SaveModelOutput; warning?: string }> {
+    if (!autoSave) {
+      return {};
+    }
+
+    try {
+      // Auto-save with no backup and validation enabled
+      const saveResult = await saveModelHandler({
+        createBackup: false,
+        validate: true
+      });
+
+      const warning = '⚠️ Auto-save performed without backup. Ensure backups are managed externally.';
+      logger.log('info', 'model.autosave.success', { path: saveResult.path });
+      
+      return { saveResult, warning };
+    } catch (err) {
+      logger.log('error', 'model.autosave.failed', { error: (err as Error)?.message || String(err) });
+      throw new Error(`Operation succeeded but auto-save failed: ${(err as Error)?.message || String(err)}`);
+    }
   }
 
   async function searchViewsHandler(input: SearchViewsInput): Promise<SearchViewsOutput> {
@@ -498,10 +593,24 @@ export function createTools(modelPath?: string) {
         properties: input.properties
       });
 
+      // Handle auto-save if requested
+      const { saveResult, warning } = await handleAutoSave(input.autoSave, element);
+
       const model = manipulator.getModel();
-      const markdown = withDisclaimer(renderElementDetailsMarkdownFromModel(model, element));
+      let markdown = renderElementDetailsMarkdownFromModel(model, element);
+      if (saveResult) {
+        markdown += `\n\n**Save Result:** ${saveResult.markdown}`;
+      }
+      if (warning) {
+        markdown += `\n\n${warning}`;
+      }
+      markdown = withDisclaimer(markdown);
+      
       const out = createElementOutput(element.id, markdown);
-      (out as any).__audit = { elementId: element.id, type: element.type };
+      (out as any).__audit = { elementId: element.id, type: element.type, autoSave: input.autoSave || false };
+      if (saveResult) {
+        (out as any).saveResult = saveResult;
+      }
       return out;
     });
   }
@@ -519,10 +628,24 @@ export function createTools(modelPath?: string) {
         properties: input.properties
       });
 
+      // Handle auto-save if requested
+      const { saveResult, warning } = await handleAutoSave(input.autoSave, element);
+
       const model = manipulator.getModel();
-      const markdown = withDisclaimer(renderElementDetailsMarkdownFromModel(model, element));
+      let markdown = renderElementDetailsMarkdownFromModel(model, element);
+      if (saveResult) {
+        markdown += `\n\n**Save Result:** ${saveResult.markdown}`;
+      }
+      if (warning) {
+        markdown += `\n\n${warning}`;
+      }
+      markdown = withDisclaimer(markdown);
+      
       const out = createUpdateElementOutput(element.id, markdown);
-      (out as any).__audit = { elementId: element.id, changes: Object.keys(input).filter(k => k !== 'identifier') };
+      (out as any).__audit = { elementId: element.id, changes: Object.keys(input).filter(k => k !== 'identifier' && k !== 'autoSave'), autoSave: input.autoSave || false };
+      if (saveResult) {
+        (out as any).saveResult = saveResult;
+      }
       return out;
     });
   }
@@ -538,9 +661,23 @@ export function createTools(modelPath?: string) {
         validate: true
       });
 
-      const markdown = withDisclaimer(`# Element Deleted\n\nElement with identifier "${input.identifier}" has been successfully deleted.`);
+      // Handle auto-save if requested
+      const { saveResult, warning } = await handleAutoSave(input.autoSave, { identifier: input.identifier });
+
+      let markdown = `# Element Deleted\n\nElement with identifier "${input.identifier}" has been successfully deleted.`;
+      if (saveResult) {
+        markdown += `\n\n**Save Result:** ${saveResult.markdown}`;
+      }
+      if (warning) {
+        markdown += `\n\n${warning}`;
+      }
+      markdown = withDisclaimer(markdown);
+      
       const out = createDeleteElementOutput(true, markdown);
-      (out as any).__audit = { elementId: input.identifier, cascade: input.cascade !== false };
+      (out as any).__audit = { elementId: input.identifier, cascade: input.cascade !== false, autoSave: input.autoSave || false };
+      if (saveResult) {
+        (out as any).saveResult = saveResult;
+      }
       return out;
     });
   }
@@ -565,17 +702,29 @@ export function createTools(modelPath?: string) {
         properties: input.properties
       });
 
-      const markdown = withDisclaimer(
-        `# Relationship Created\n\n` +
+      // Handle auto-save if requested
+      const { saveResult, warning } = await handleAutoSave(input.autoSave, relationship);
+
+      let markdown = `# Relationship Created\n\n` +
         `**ID:** ${relationship.id}\n` +
         `**Type:** ${relationship.type}\n` +
         `**Source:** ${relationship.sourceId}\n` +
         `**Target:** ${relationship.targetId}\n` +
         (relationship.name ? `**Name:** ${relationship.name}\n` : '') +
-        (relationship.documentation ? `**Documentation:** ${relationship.documentation}\n` : '')
-      );
+        (relationship.documentation ? `**Documentation:** ${relationship.documentation}\n` : '');
+      if (saveResult) {
+        markdown += `\n\n**Save Result:** ${saveResult.markdown}`;
+      }
+      if (warning) {
+        markdown += `\n\n${warning}`;
+      }
+      markdown = withDisclaimer(markdown);
+      
       const out = createRelationshipOutput(relationship.id, markdown);
-      (out as any).__audit = { relationshipId: relationship.id, type: relationship.type };
+      (out as any).__audit = { relationshipId: relationship.id, type: relationship.type, autoSave: input.autoSave || false };
+      if (saveResult) {
+        (out as any).saveResult = saveResult;
+      }
       return out;
     });
   }
@@ -595,17 +744,29 @@ export function createTools(modelPath?: string) {
         properties: input.properties
       });
 
-      const markdown = withDisclaimer(
-        `# Relationship Updated\n\n` +
+      // Handle auto-save if requested
+      const { saveResult, warning } = await handleAutoSave(input.autoSave, relationship);
+
+      let markdown = `# Relationship Updated\n\n` +
         `**ID:** ${relationship.id}\n` +
         `**Type:** ${relationship.type}\n` +
         `**Source:** ${relationship.sourceId}\n` +
         `**Target:** ${relationship.targetId}\n` +
         (relationship.name ? `**Name:** ${relationship.name}\n` : '') +
-        (relationship.documentation ? `**Documentation:** ${relationship.documentation}\n` : '')
-      );
+        (relationship.documentation ? `**Documentation:** ${relationship.documentation}\n` : '');
+      if (saveResult) {
+        markdown += `\n\n**Save Result:** ${saveResult.markdown}`;
+      }
+      if (warning) {
+        markdown += `\n\n${warning}`;
+      }
+      markdown = withDisclaimer(markdown);
+      
       const out = createUpdateRelationshipOutput(relationship.id, markdown);
-      (out as any).__audit = { relationshipId: relationship.id, changes: Object.keys(input).filter(k => k !== 'identifier') };
+      (out as any).__audit = { relationshipId: relationship.id, changes: Object.keys(input).filter(k => k !== 'identifier' && k !== 'autoSave'), autoSave: input.autoSave || false };
+      if (saveResult) {
+        (out as any).saveResult = saveResult;
+      }
       return out;
     });
   }
@@ -618,9 +779,23 @@ export function createTools(modelPath?: string) {
 
       await manipulator.deleteRelationship(input.identifier);
 
-      const markdown = withDisclaimer(`# Relationship Deleted\n\nRelationship with identifier "${input.identifier}" has been successfully deleted.`);
+      // Handle auto-save if requested
+      const { saveResult, warning } = await handleAutoSave(input.autoSave, { identifier: input.identifier });
+
+      let markdown = `# Relationship Deleted\n\nRelationship with identifier "${input.identifier}" has been successfully deleted.`;
+      if (saveResult) {
+        markdown += `\n\n**Save Result:** ${saveResult.markdown}`;
+      }
+      if (warning) {
+        markdown += `\n\n${warning}`;
+      }
+      markdown = withDisclaimer(markdown);
+      
       const out = createDeleteRelationshipOutput(true, markdown);
-      (out as any).__audit = { relationshipId: input.identifier };
+      (out as any).__audit = { relationshipId: input.identifier, autoSave: input.autoSave || false };
+      if (saveResult) {
+        (out as any).saveResult = saveResult;
+      }
       return out;
     });
   }
@@ -647,10 +822,24 @@ export function createTools(modelPath?: string) {
         nodeHierarchy: input.nodeHierarchy
       });
 
+      // Handle auto-save if requested
+      const { saveResult, warning } = await handleAutoSave(input.autoSave, view);
+
       const model = manipulator.getModel();
-      const markdown = withDisclaimer(renderViewDetailsMarkdownFromModel(model, view));
+      let markdown = renderViewDetailsMarkdownFromModel(model, view);
+      if (saveResult) {
+        markdown += `\n\n**Save Result:** ${saveResult.markdown}`;
+      }
+      if (warning) {
+        markdown += `\n\n${warning}`;
+      }
+      markdown = withDisclaimer(markdown);
+      
       const out = createViewOutput(view.id, markdown);
-      (out as any).__audit = { viewId: view.id, name: view.name };
+      (out as any).__audit = { viewId: view.id, name: view.name, autoSave: input.autoSave || false };
+      if (saveResult) {
+        (out as any).saveResult = saveResult;
+      }
       return out;
     });
   }
@@ -672,10 +861,24 @@ export function createTools(modelPath?: string) {
         nodeHierarchy: input.nodeHierarchy
       });
 
+      // Handle auto-save if requested
+      const { saveResult, warning } = await handleAutoSave(input.autoSave, view);
+
       const model = manipulator.getModel();
-      const markdown = withDisclaimer(renderViewDetailsMarkdownFromModel(model, view));
+      let markdown = renderViewDetailsMarkdownFromModel(model, view);
+      if (saveResult) {
+        markdown += `\n\n**Save Result:** ${saveResult.markdown}`;
+      }
+      if (warning) {
+        markdown += `\n\n${warning}`;
+      }
+      markdown = withDisclaimer(markdown);
+      
       const out = createUpdateViewOutput(view.id, markdown);
-      (out as any).__audit = { viewId: view.id, changes: Object.keys(input).filter(k => k !== 'identifier') };
+      (out as any).__audit = { viewId: view.id, changes: Object.keys(input).filter(k => k !== 'identifier' && k !== 'autoSave'), autoSave: input.autoSave || false };
+      if (saveResult) {
+        (out as any).saveResult = saveResult;
+      }
       return out;
     });
   }
@@ -688,13 +891,25 @@ export function createTools(modelPath?: string) {
 
       await manipulator.addElementToView(input.viewId, input.elementId, input.parentElementId);
 
-      const markdown = withDisclaimer(
-        `# Element Added to View\n\n` +
+      // Handle auto-save if requested
+      const { saveResult, warning } = await handleAutoSave(input.autoSave, { viewId: input.viewId, elementId: input.elementId });
+
+      let markdown = `# Element Added to View\n\n` +
         `Element "${input.elementId}" has been successfully added to view "${input.viewId}".` +
-        (input.parentElementId ? `\n\nParent element: ${input.parentElementId}` : '')
-      );
+        (input.parentElementId ? `\n\nParent element: ${input.parentElementId}` : '');
+      if (saveResult) {
+        markdown += `\n\n**Save Result:** ${saveResult.markdown}`;
+      }
+      if (warning) {
+        markdown += `\n\n${warning}`;
+      }
+      markdown = withDisclaimer(markdown);
+      
       const out = createAddElementToViewOutput(true, markdown);
-      (out as any).__audit = { viewId: input.viewId, elementId: input.elementId, parentElementId: input.parentElementId };
+      (out as any).__audit = { viewId: input.viewId, elementId: input.elementId, parentElementId: input.parentElementId, autoSave: input.autoSave || false };
+      if (saveResult) {
+        (out as any).saveResult = saveResult;
+      }
       return out;
     });
   }
@@ -707,12 +922,24 @@ export function createTools(modelPath?: string) {
 
       await manipulator.removeElementFromView(input.viewId, input.elementId);
 
-      const markdown = withDisclaimer(
-        `# Element Removed from View\n\n` +
-        `Element "${input.elementId}" has been successfully removed from view "${input.viewId}".`
-      );
+      // Handle auto-save if requested
+      const { saveResult, warning } = await handleAutoSave(input.autoSave, { viewId: input.viewId, elementId: input.elementId });
+
+      let markdown = `# Element Removed from View\n\n` +
+        `Element "${input.elementId}" has been successfully removed from view "${input.viewId}".`;
+      if (saveResult) {
+        markdown += `\n\n**Save Result:** ${saveResult.markdown}`;
+      }
+      if (warning) {
+        markdown += `\n\n${warning}`;
+      }
+      markdown = withDisclaimer(markdown);
+      
       const out = createRemoveElementFromViewOutput(true, markdown);
-      (out as any).__audit = { viewId: input.viewId, elementId: input.elementId };
+      (out as any).__audit = { viewId: input.viewId, elementId: input.elementId, autoSave: input.autoSave || false };
+      if (saveResult) {
+        (out as any).saveResult = saveResult;
+      }
       return out;
     });
   }
@@ -725,9 +952,23 @@ export function createTools(modelPath?: string) {
 
       await manipulator.deleteView(input.identifier);
 
-      const markdown = withDisclaimer(`# View Deleted\n\nView with identifier "${input.identifier}" has been successfully deleted.`);
+      // Handle auto-save if requested
+      const { saveResult, warning } = await handleAutoSave(input.autoSave, { identifier: input.identifier });
+
+      let markdown = `# View Deleted\n\nView with identifier "${input.identifier}" has been successfully deleted.`;
+      if (saveResult) {
+        markdown += `\n\n**Save Result:** ${saveResult.markdown}`;
+      }
+      if (warning) {
+        markdown += `\n\n${warning}`;
+      }
+      markdown = withDisclaimer(markdown);
+      
       const out = createDeleteViewOutput(true, markdown);
-      (out as any).__audit = { viewId: input.identifier };
+      (out as any).__audit = { viewId: input.identifier, autoSave: input.autoSave || false };
+      if (saveResult) {
+        (out as any).saveResult = saveResult;
+      }
       return out;
     });
   }
@@ -871,6 +1112,236 @@ export function createTools(modelPath?: string) {
     });
   }
 
+  async function setModelPathHandler(input: SetModelPathInput): Promise<SetModelPathOutput> {
+    return logger.auditToolInvocation('SetModelPath', input, async () => {
+      if (!input || !input.path) {
+        throw new Error('path is required');
+      }
+
+      // Check for unsaved changes in current model
+      const hasUnsavedChanges = manipulator.isModified();
+      let warning: string | undefined;
+      if (hasUnsavedChanges) {
+        warning = 'Current model has unsaved changes. These changes will be lost when switching models.';
+        logger.log('warn', 'model.path.change.unsaved', { 
+          currentPath: loader.getPath(), 
+          newPath: input.path 
+        });
+      }
+
+      // Validate path
+      const validationResult = validateModelPath(input.path);
+      if (!validationResult.valid) {
+        logger.log('error', 'model.path.validation.failed', { 
+          path: input.path, 
+          error: validationResult.error 
+        });
+        throw new Error(`Path validation failed: ${validationResult.error}`);
+      }
+
+      const resolvedPath = validationResult.resolvedPath!;
+      const previousPath = loader.getPath();
+
+      // Try to load the new model to validate it's valid ArchiMate XML
+      try {
+        loader.setPath(resolvedPath);
+        manipulator.reload(); // Reload manipulator with new model
+        
+        const model = manipulator.getModel();
+        const elementCount = model.elements?.length || 0;
+        const viewCount = model.views?.length || 0;
+
+        const markdown = withDisclaimer(
+          `# Model Path Changed Successfully\n\n` +
+          `**New Path:** ${resolvedPath}\n` +
+          `**Elements:** ${elementCount}\n` +
+          `**Views:** ${viewCount}\n` +
+          `**Status:** ${hasUnsavedChanges ? '⚠️ Previous model had unsaved changes (lost)' : 'Clean switch'}\n\n` +
+          (warning ? `⚠️ **Warning:** ${warning}\n\n` : '') +
+          `Model loaded successfully.`
+        );
+
+        const out = createSetModelPathOutput(
+          true,
+          resolvedPath,
+          elementCount,
+          viewCount,
+          false, // New model has no unsaved changes
+          markdown,
+          warning
+        );
+        
+        (out as any).__audit = { 
+          path: resolvedPath, 
+          elementCount, 
+          viewCount,
+          hadUnsavedChanges: hasUnsavedChanges
+        };
+        
+        logger.log('info', 'model.path.change.success', { 
+          path: resolvedPath, 
+          elementCount, 
+          viewCount 
+        });
+        
+        return out;
+      } catch (err) {
+        // Restore previous path on failure
+        loader.setPath(previousPath);
+        logger.log('error', 'model.path.change.failed', { 
+          path: resolvedPath, 
+          previousPath,
+          error: (err as Error)?.message || String(err) 
+        });
+        throw new Error(`Failed to load model from path: ${(err as Error)?.message || String(err)}`);
+      }
+    });
+  }
+
+  async function createModelHandler(input: CreateModelInput): Promise<CreateModelOutput> {
+    return logger.auditToolInvocation('CreateModel', input, async () => {
+      if (!input || !input.path) {
+        throw new Error('path is required');
+      }
+
+      // Check for unsaved changes in current model
+      const hasUnsavedChanges = manipulator.isModified();
+      if (hasUnsavedChanges) {
+        throw new Error('Current model has unsaved changes. Please save or discard changes before creating a new model.');
+      }
+
+      // Validate path (but don't require file to exist)
+      const validationResult = validatePath(input.path, {
+        checkExists: false,
+        checkReadable: false,
+        mustBeFile: true
+      });
+      if (!validationResult.valid) {
+        logger.log('error', 'model.create.path.validation.failed', { 
+          path: input.path, 
+          error: validationResult.error 
+        });
+        throw new Error(`Path validation failed: ${validationResult.error}`);
+      }
+
+      const resolvedPath = validationResult.resolvedPath!;
+
+      // Check if file already exists (prevent overwrite)
+      if (existsSync(resolvedPath)) {
+        logger.log('error', 'model.create.file.exists', { path: resolvedPath });
+        throw new Error(`File already exists at path: ${resolvedPath}. Use SetModelPath to load an existing model.`);
+      }
+
+      // Generate identifier if not provided
+      const identifier = input.identifier || `model-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const modelName = input.name || 'New ArchiMate Model';
+
+      // Simple XML escape function
+      const escapeXml = (str: string): string => {
+        return str
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&apos;');
+      };
+
+      // Create parent directories if they don't exist
+      const parentDir = dirname(resolvedPath);
+      try {
+        if (!existsSync(parentDir)) {
+          mkdirSync(parentDir, { recursive: true });
+          logger.log('info', 'model.create.directory.created', { path: parentDir });
+        }
+      } catch (err) {
+        logger.log('error', 'model.create.directory.failed', { 
+          path: parentDir, 
+          error: (err as Error)?.message || String(err) 
+        });
+        throw new Error(`Failed to create directory: ${(err as Error)?.message || String(err)}`);
+      }
+
+      // Create empty ArchiMate model XML
+      const emptyModelXml = `<?xml version="1.0" encoding="UTF-8"?>
+<model xmlns="http://www.opengroup.org/xsd/archimate/3.0/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.opengroup.org/xsd/archimate/3.0/ http://www.opengroup.org/xsd/archimate/3.1/archimate3_Diagram.xsd" identifier="${escapeXml(identifier)}">
+  <name xml:lang="en">${escapeXml(modelName)}</name>
+</model>`;
+
+      // Write the file
+      try {
+        writeFileSync(resolvedPath, emptyModelXml, 'utf8');
+        logger.log('info', 'model.create.file.created', { path: resolvedPath, identifier, name: modelName });
+      } catch (err) {
+        logger.log('error', 'model.create.file.write.failed', { 
+          path: resolvedPath, 
+          error: (err as Error)?.message || String(err) 
+        });
+        throw new Error(`Failed to write model file: ${(err as Error)?.message || String(err)}`);
+      }
+
+      // Load the newly created model
+      const previousPath = loader.getPath();
+      try {
+        loader.setPath(resolvedPath);
+        manipulator.reload();
+        
+        const model = manipulator.getModel();
+        const elementCount = model.elements?.length || 0;
+        const viewCount = model.views?.length || 0;
+        const relationshipCount = model.relationships?.length || 0;
+
+        const markdown = withDisclaimer(
+          `# New Model Created Successfully\n\n` +
+          `**Path:** ${resolvedPath}\n` +
+          `**Name:** ${modelName}\n` +
+          `**Identifier:** ${identifier}\n` +
+          `**Elements:** ${elementCount}\n` +
+          `**Views:** ${viewCount}\n` +
+          `**Relationships:** ${relationshipCount}\n\n` +
+          `The new empty ArchiMate model has been created and loaded successfully.`
+        );
+
+        const out = createCreateModelOutput(
+          true,
+          resolvedPath,
+          elementCount,
+          viewCount,
+          relationshipCount,
+          false, // New model has no unsaved changes
+          'New model created successfully',
+          markdown
+        );
+        
+        (out as any).__audit = { 
+          path: resolvedPath, 
+          identifier,
+          name: modelName,
+          elementCount, 
+          viewCount,
+          relationshipCount
+        };
+        
+        logger.log('info', 'model.create.success', { 
+          path: resolvedPath, 
+          elementCount, 
+          viewCount,
+          relationshipCount
+        });
+        
+        return out;
+      } catch (err) {
+        // Restore previous path on failure
+        loader.setPath(previousPath);
+        logger.log('error', 'model.create.load.failed', { 
+          path: resolvedPath, 
+          previousPath,
+          error: (err as Error)?.message || String(err) 
+        });
+        throw new Error(`Failed to load newly created model: ${(err as Error)?.message || String(err)}`);
+      }
+    });
+  }
+
   return { 
     searchViewsHandler, 
     getViewDetailsHandler, 
@@ -892,6 +1363,8 @@ export function createTools(modelPath?: string) {
     validateRelationshipHandler,
     saveModelHandler,
     getModelPathHandler,
+    setModelPathHandler,
+    createModelHandler,
     loader,
     manipulator
   };

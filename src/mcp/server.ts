@@ -106,16 +106,17 @@ export async function createMcpServer() {
       'CreateElement',
       {
         title: 'Create Element',
-        description: 'Create a new element in the ArchiMate model',
+        description: 'Create a new element in the ArchiMate model. ⚠️ WARNING: If autoSave is true, changes are saved without backup. Create a backup first using SaveModel with createBackup: true.',
         inputSchema: {
           type: z.string().describe('ArchiMate element type (e.g., ApplicationComponent, BusinessProcess)'),
           name: z.string().describe('Element name'),
           identifier: z.string().optional().describe('Element identifier (auto-generated if not provided)'),
           documentation: z.string().optional().describe('Element documentation'),
-          properties: z.record(z.string()).optional().describe('Custom properties as key-value pairs')
+          properties: z.record(z.string()).optional().describe('Custom properties as key-value pairs'),
+          autoSave: z.boolean().optional().describe('If true, automatically save after operation without backup (default: false). ⚠️ WARNING: Ensure backups are managed externally.')
         },
       },
-      async (args: { type: string; name: string; identifier?: string; documentation?: string; properties?: Record<string, string> }) => {
+      async (args: { type: string; name: string; identifier?: string; documentation?: string; properties?: Record<string, string>; autoSave?: boolean }) => {
         const out = await tools.createElementHandler(args);
         return { content: [{ type: 'text', text: out.markdown }], structuredContent: out };
       }
@@ -128,16 +129,17 @@ export async function createMcpServer() {
       'UpdateElement',
       {
         title: 'Update Element',
-        description: 'Update an existing element in the ArchiMate model',
+        description: 'Update an existing element in the ArchiMate model. ⚠️ WARNING: If autoSave is true, changes are saved without backup. Create a backup first using SaveModel with createBackup: true.',
         inputSchema: {
           identifier: z.string().describe('Element identifier'),
           name: z.string().optional().describe('Updated element name'),
           type: z.string().optional().describe('Updated element type'),
           documentation: z.string().optional().describe('Updated element documentation'),
-          properties: z.record(z.string()).optional().describe('Updated custom properties as key-value pairs')
+          properties: z.record(z.string()).optional().describe('Updated custom properties as key-value pairs'),
+          autoSave: z.boolean().optional().describe('If true, automatically save after operation without backup (default: false). ⚠️ WARNING: Ensure backups are managed externally.')
         },
       },
-      async (args: { identifier: string; name?: string; type?: string; documentation?: string; properties?: Record<string, string> }) => {
+      async (args: { identifier: string; name?: string; type?: string; documentation?: string; properties?: Record<string, string>; autoSave?: boolean }) => {
         const out = await tools.updateElementHandler(args);
         return { content: [{ type: 'text', text: out.markdown }], structuredContent: out };
       }
@@ -150,13 +152,14 @@ export async function createMcpServer() {
       'DeleteElement',
       {
         title: 'Delete Element',
-        description: 'Delete an element from the ArchiMate model',
+        description: 'Delete an element from the ArchiMate model. ⚠️ WARNING: If autoSave is true, changes are saved without backup. Create a backup first using SaveModel with createBackup: true.',
         inputSchema: {
           identifier: z.string().describe('Element identifier'),
-          cascade: z.boolean().optional().describe('If true, delete dependent relationships and remove from views (default: true)')
+          cascade: z.boolean().optional().describe('If true, delete dependent relationships and remove from views (default: true)'),
+          autoSave: z.boolean().optional().describe('If true, automatically save after operation without backup (default: false). ⚠️ WARNING: Ensure backups are managed externally.')
         },
       },
-      async (args: { identifier: string; cascade?: boolean }) => {
+      async (args: { identifier: string; cascade?: boolean; autoSave?: boolean }) => {
         const out = await tools.deleteElementHandler(args);
         return { content: [{ type: 'text', text: out.markdown }], structuredContent: out };
       }
@@ -173,7 +176,7 @@ export async function createMcpServer() {
       'CreateRelationship',
       {
         title: 'Create Relationship',
-        description: 'Create a new relationship between elements in the ArchiMate model',
+        description: 'Create a new relationship between elements in the ArchiMate model. ⚠️ WARNING: If autoSave is true, changes are saved without backup. Create a backup first using SaveModel with createBackup: true.',
         inputSchema: {
           type: z.string().describe('ArchiMate relationship type (e.g., Serving, Access, Composition)'),
           sourceId: z.string().describe('Source element identifier'),
@@ -181,10 +184,11 @@ export async function createMcpServer() {
           identifier: z.string().optional().describe('Relationship identifier (auto-generated if not provided)'),
           name: z.string().optional().describe('Relationship name'),
           documentation: z.string().optional().describe('Relationship documentation'),
-          properties: z.record(z.string()).optional().describe('Custom properties as key-value pairs')
+          properties: z.record(z.string()).optional().describe('Custom properties as key-value pairs'),
+          autoSave: z.boolean().optional().describe('If true, automatically save after operation without backup (default: false). ⚠️ WARNING: Ensure backups are managed externally.')
         },
       },
-      async (args: { type: string; sourceId: string; targetId: string; identifier?: string; name?: string; documentation?: string; properties?: Record<string, string> }) => {
+      async (args: { type: string; sourceId: string; targetId: string; identifier?: string; name?: string; documentation?: string; properties?: Record<string, string>; autoSave?: boolean }) => {
         const out = await tools.createRelationshipHandler(args);
         return { content: [{ type: 'text', text: out.markdown }], structuredContent: out };
       }
@@ -197,7 +201,7 @@ export async function createMcpServer() {
       'UpdateRelationship',
       {
         title: 'Update Relationship',
-        description: 'Update an existing relationship in the ArchiMate model',
+        description: 'Update an existing relationship in the ArchiMate model. ⚠️ WARNING: If autoSave is true, changes are saved without backup. Create a backup first using SaveModel with createBackup: true.',
         inputSchema: {
           identifier: z.string().describe('Relationship identifier'),
           type: z.string().optional().describe('Updated relationship type'),
@@ -205,10 +209,11 @@ export async function createMcpServer() {
           targetId: z.string().optional().describe('Updated target element identifier'),
           name: z.string().optional().describe('Updated relationship name'),
           documentation: z.string().optional().describe('Updated relationship documentation'),
-          properties: z.record(z.string()).optional().describe('Updated custom properties as key-value pairs')
+          properties: z.record(z.string()).optional().describe('Updated custom properties as key-value pairs'),
+          autoSave: z.boolean().optional().describe('If true, automatically save after operation without backup (default: false). ⚠️ WARNING: Ensure backups are managed externally.')
         },
       },
-      async (args: { identifier: string; type?: string; sourceId?: string; targetId?: string; name?: string; documentation?: string; properties?: Record<string, string> }) => {
+      async (args: { identifier: string; type?: string; sourceId?: string; targetId?: string; name?: string; documentation?: string; properties?: Record<string, string>; autoSave?: boolean }) => {
         const out = await tools.updateRelationshipHandler(args);
         return { content: [{ type: 'text', text: out.markdown }], structuredContent: out };
       }
@@ -221,12 +226,13 @@ export async function createMcpServer() {
       'DeleteRelationship',
       {
         title: 'Delete Relationship',
-        description: 'Delete a relationship from the ArchiMate model',
+        description: 'Delete a relationship from the ArchiMate model. ⚠️ WARNING: If autoSave is true, changes are saved without backup. Create a backup first using SaveModel with createBackup: true.',
         inputSchema: {
-          identifier: z.string().describe('Relationship identifier')
+          identifier: z.string().describe('Relationship identifier'),
+          autoSave: z.boolean().optional().describe('If true, automatically save after operation without backup (default: false). ⚠️ WARNING: Ensure backups are managed externally.')
         },
       },
-      async (args: { identifier: string }) => {
+      async (args: { identifier: string; autoSave?: boolean }) => {
         const out = await tools.deleteRelationshipHandler(args);
         return { content: [{ type: 'text', text: out.markdown }], structuredContent: out };
       }
@@ -243,7 +249,7 @@ export async function createMcpServer() {
       'CreateView',
       {
         title: 'Create View',
-        description: 'Create a new view in the ArchiMate model',
+        description: 'Create a new view in the ArchiMate model. ⚠️ WARNING: If autoSave is true, changes are saved without backup. Create a backup first using SaveModel with createBackup: true.',
         inputSchema: {
           name: z.string().describe('View name'),
           identifier: z.string().optional().describe('View identifier (auto-generated if not provided)'),
@@ -256,7 +262,8 @@ export async function createMcpServer() {
           nodeHierarchy: z.array(z.object({
             parentElement: z.string(),
             childElement: z.string()
-          })).optional().describe('Node hierarchy (parent-child relationships)')
+          })).optional().describe('Node hierarchy (parent-child relationships)'),
+          autoSave: z.boolean().optional().describe('If true, automatically save after operation without backup (default: false). ⚠️ WARNING: Ensure backups are managed externally.')
         },
       },
       async (args: any) => {
@@ -272,7 +279,7 @@ export async function createMcpServer() {
       'UpdateView',
       {
         title: 'Update View',
-        description: 'Update an existing view in the ArchiMate model',
+        description: 'Update an existing view in the ArchiMate model. ⚠️ WARNING: If autoSave is true, changes are saved without backup. Create a backup first using SaveModel with createBackup: true.',
         inputSchema: {
           identifier: z.string().describe('View identifier'),
           name: z.string().optional().describe('Updated view name'),
@@ -285,7 +292,8 @@ export async function createMcpServer() {
           nodeHierarchy: z.array(z.object({
             parentElement: z.string(),
             childElement: z.string()
-          })).optional().describe('Updated node hierarchy (parent-child relationships)')
+          })).optional().describe('Updated node hierarchy (parent-child relationships)'),
+          autoSave: z.boolean().optional().describe('If true, automatically save after operation without backup (default: false). ⚠️ WARNING: Ensure backups are managed externally.')
         },
       },
       async (args: any) => {
@@ -301,14 +309,15 @@ export async function createMcpServer() {
       'AddElementToView',
       {
         title: 'Add Element to View',
-        description: 'Add an element to a view in the ArchiMate model',
+        description: 'Add an element to a view in the ArchiMate model. ⚠️ WARNING: If autoSave is true, changes are saved without backup. Create a backup first using SaveModel with createBackup: true.',
         inputSchema: {
           viewId: z.string().describe('View identifier'),
           elementId: z.string().describe('Element identifier'),
-          parentElementId: z.string().optional().describe('Optional parent element identifier for hierarchy')
+          parentElementId: z.string().optional().describe('Optional parent element identifier for hierarchy'),
+          autoSave: z.boolean().optional().describe('If true, automatically save after operation without backup (default: false). ⚠️ WARNING: Ensure backups are managed externally.')
         },
       },
-      async (args: { viewId: string; elementId: string; parentElementId?: string }) => {
+      async (args: { viewId: string; elementId: string; parentElementId?: string; autoSave?: boolean }) => {
         const out = await tools.addElementToViewHandler(args);
         return { content: [{ type: 'text', text: out.markdown }], structuredContent: out };
       }
@@ -321,13 +330,14 @@ export async function createMcpServer() {
       'RemoveElementFromView',
       {
         title: 'Remove Element from View',
-        description: 'Remove an element from a view in the ArchiMate model',
+        description: 'Remove an element from a view in the ArchiMate model. ⚠️ WARNING: If autoSave is true, changes are saved without backup. Create a backup first using SaveModel with createBackup: true.',
         inputSchema: {
           viewId: z.string().describe('View identifier'),
-          elementId: z.string().describe('Element identifier')
+          elementId: z.string().describe('Element identifier'),
+          autoSave: z.boolean().optional().describe('If true, automatically save after operation without backup (default: false). ⚠️ WARNING: Ensure backups are managed externally.')
         },
       },
-      async (args: { viewId: string; elementId: string }) => {
+      async (args: { viewId: string; elementId: string; autoSave?: boolean }) => {
         const out = await tools.removeElementFromViewHandler(args);
         return { content: [{ type: 'text', text: out.markdown }], structuredContent: out };
       }
@@ -340,12 +350,13 @@ export async function createMcpServer() {
       'DeleteView',
       {
         title: 'Delete View',
-        description: 'Delete a view from the ArchiMate model',
+        description: 'Delete a view from the ArchiMate model. ⚠️ WARNING: If autoSave is true, changes are saved without backup. Create a backup first using SaveModel with createBackup: true.',
         inputSchema: {
-          identifier: z.string().describe('View identifier')
+          identifier: z.string().describe('View identifier'),
+          autoSave: z.boolean().optional().describe('If true, automatically save after operation without backup (default: false). ⚠️ WARNING: Ensure backups are managed externally.')
         },
       },
-      async (args: { identifier: string }) => {
+      async (args: { identifier: string; autoSave?: boolean }) => {
         const out = await tools.deleteViewHandler(args);
         return { content: [{ type: 'text', text: out.markdown }], structuredContent: out };
       }
@@ -451,6 +462,44 @@ export async function createMcpServer() {
     );
     console.info('MCP: registered tool: GetModelPath');
     logger.log('info', 'mcp.tool.register', { tool: 'GetModelPath', highLevel: true });
+
+    // Register the SetModelPath tool
+    server.registerTool(
+      'SetModelPath',
+      {
+        title: 'Set Model Path',
+        description: 'Dynamically change the ArchiMate model file path at runtime. Validates path security and warns if current model has unsaved changes.',
+        inputSchema: {
+          path: z.string().describe('Absolute or relative path to ArchiMate model file (.archimate or .xml)')
+        },
+      },
+      async (args: { path: string }) => {
+        const out = await tools.setModelPathHandler(args);
+        return { content: [{ type: 'text', text: out.markdown }], structuredContent: out };
+      }
+    );
+    console.info('MCP: registered tool: SetModelPath');
+    logger.log('info', 'mcp.tool.register', { tool: 'SetModelPath', highLevel: true });
+
+    // Register the CreateModel tool
+    server.registerTool(
+      'CreateModel',
+      {
+        title: 'Create Model',
+        description: 'Create a new empty ArchiMate model at a specified path. ⚠️ WARNING: If current model has unsaved changes, operation will fail.',
+        inputSchema: {
+          path: z.string().describe('Absolute or relative path where to create the new model file (.archimate or .xml)'),
+          name: z.string().optional().describe('Model name (default: "New ArchiMate Model")'),
+          identifier: z.string().optional().describe('Model identifier (auto-generated if not provided)')
+        },
+      },
+      async (args: { path: string; name?: string; identifier?: string }) => {
+        const out = await tools.createModelHandler(args);
+        return { content: [{ type: 'text', text: out.markdown }], structuredContent: out };
+      }
+    );
+    console.info('MCP: registered tool: CreateModel');
+    logger.log('info', 'mcp.tool.register', { tool: 'CreateModel', highLevel: true });
 
     sdkServer = server;
   } catch (err) {

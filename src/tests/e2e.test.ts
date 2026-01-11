@@ -14,9 +14,10 @@ import { ModelLoader } from '../model/loader';
 import { ModelManipulator } from '../model/manipulator';
 import { XSDValidator } from '../utils/xsd-validator';
 import { ArchiMateXMLBuilder } from '../model/persistence';
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
+import { createTools } from '../mcp/tools';
 
 const FIXTURES_DIR = join(__dirname, 'fixtures');
 const BASIC_MODEL = join(FIXTURES_DIR, 'basic-model.xml');
@@ -477,6 +478,142 @@ describe('End-to-End Tests', () => {
         expect(error.code).toBeDefined();
         expect(error.suggestions).toBeDefined();
         expect(Array.isArray(error.suggestions)).toBe(true);
+      }
+    });
+  });
+
+  describe('CreateModel Integration', () => {
+    it('should create new model and immediately use it', async () => {
+      const newModelPath = join(TEMP_DIR, `e2e-new-model-${Date.now()}.archimate`);
+      
+      // Create tools with existing model
+      const existingModelPath = BASIC_MODEL;
+      const tools = createTools(existingModelPath);
+      
+      // Create new model
+      const createResult = await tools.createModelHandler({
+        path: newModelPath,
+        name: 'E2E Test Model'
+      });
+      
+      expect(createResult.success).toBe(true);
+      expect(createResult.elementCount).toBe(0);
+      expect(createResult.viewCount).toBe(0);
+      expect(existsSync(newModelPath)).toBe(true);
+      
+      // Verify model is loaded
+      const pathResult = await tools.getModelPathHandler({});
+      expect(pathResult.path).toBe(newModelPath);
+      
+      // Create an element in the new model
+      const elementResult = await tools.createElementHandler({
+        type: 'ApplicationComponent',
+        name: 'Test Component in New Model'
+      });
+      
+      expect(elementResult.id).toBeDefined();
+      expect(elementResult.markdown).toContain('Test Component in New Model');
+      
+      // Save the model
+      const saveResult = await tools.saveModelHandler({
+        createBackup: false,
+        validate: true
+      });
+      
+      expect(saveResult.success).toBe(true);
+      expect(saveResult.path).toBe(newModelPath);
+      
+      // Verify the saved model can be loaded
+      const newLoader = new ModelLoader(newModelPath);
+      const newManipulator = new ModelManipulator(newLoader);
+      const model = newManipulator.getModel();
+      
+      expect(model.elements.length).toBe(1);
+      expect(model.elements[0].name).toBe('Test Component in New Model');
+      
+      // Cleanup
+      if (existsSync(newModelPath)) {
+        unlinkSync(newModelPath);
+      }
+    });
+
+    it('should create model with custom identifier and verify in file', async () => {
+      const newModelPath = join(TEMP_DIR, `e2e-custom-id-${Date.now()}.archimate`);
+      const customId = 'e2e-test-model-id';
+      
+      const tools = createTools(BASIC_MODEL);
+      
+      const result = await tools.createModelHandler({
+        path: newModelPath,
+        name: 'Custom ID Model',
+        identifier: customId
+      });
+      
+      expect(result.success).toBe(true);
+      expect(existsSync(newModelPath)).toBe(true);
+      
+      // Verify identifier in file
+      const fileContent = readFileSync(newModelPath, 'utf8');
+      expect(fileContent).toContain(`identifier="${customId}"`);
+      expect(fileContent).toContain('<name xml:lang="en">Custom ID Model</name>');
+      
+      // Verify model loads correctly
+      const loader = new ModelLoader(newModelPath);
+      const manipulator = new ModelManipulator(loader);
+      const model = manipulator.getModel();
+      
+      expect(model.elements.length).toBe(0);
+      expect(model.views.length).toBe(0);
+      
+      // Cleanup
+      if (existsSync(newModelPath)) {
+        unlinkSync(newModelPath);
+      }
+    });
+
+    it('should fail to create model if current model has unsaved changes', async () => {
+      const newModelPath = join(TEMP_DIR, `e2e-fail-${Date.now()}.archimate`);
+      const tools = createTools(BASIC_MODEL);
+      
+      // Make a change to current model
+      await tools.createElementHandler({
+        type: 'ApplicationComponent',
+        name: 'Unsaved Component'
+      });
+      
+      // Try to create new model - should fail
+      await expect(
+        tools.createModelHandler({ path: newModelPath })
+      ).rejects.toThrow('unsaved changes');
+      
+      // Cleanup
+      if (existsSync(newModelPath)) {
+        unlinkSync(newModelPath);
+      }
+    });
+
+    it('should create model in nested directory structure', async () => {
+      const nestedPath = join(TEMP_DIR, 'nested', 'deep', `e2e-nested-${Date.now()}.archimate`);
+      const tools = createTools(BASIC_MODEL);
+      
+      const result = await tools.createModelHandler({
+        path: nestedPath,
+        name: 'Nested Model'
+      });
+      
+      expect(result.success).toBe(true);
+      expect(existsSync(nestedPath)).toBe(true);
+      
+      // Verify model works
+      const loader = new ModelLoader(nestedPath);
+      const manipulator = new ModelManipulator(loader);
+      const model = manipulator.getModel();
+      
+      expect(model.elements.length).toBe(0);
+      
+      // Cleanup
+      if (existsSync(nestedPath)) {
+        unlinkSync(nestedPath);
       }
     });
   });

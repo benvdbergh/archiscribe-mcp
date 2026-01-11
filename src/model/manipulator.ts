@@ -131,6 +131,12 @@ export class ModelManipulator {
       throw new ValidationError(`Invalid element type: ${data.type}`, validationResult, undefined, errorDef?.suggestions, { operation: 'createElement', elementType: data.type });
     }
 
+    // Normalize element type: "Network" -> "CommunicationNetwork" for Archi 5.7 compatibility
+    let normalizedType = data.type.trim();
+    if (normalizedType === 'Network') {
+      normalizedType = 'CommunicationNetwork';
+    }
+
     // Generate identifier if not provided
     let identifier = data.identifier;
     if (!identifier || identifier.trim() === '') {
@@ -147,7 +153,7 @@ export class ModelManipulator {
     const element: ElementObject = {
       id: identifier,
       name: data.name.trim(),
-      type: data.type.trim(),
+      type: normalizedType,
       documentation: data.documentation?.trim(),
       properties: data.properties ? { ...data.properties } : {},
       inViews: [],
@@ -193,7 +199,12 @@ export class ModelManipulator {
     }
 
     if (data.type !== undefined) {
-      element.type = data.type.trim();
+      // Normalize element type: "Network" -> "CommunicationNetwork" for Archi 5.7 compatibility
+      let normalizedType = data.type.trim();
+      if (normalizedType === 'Network') {
+        normalizedType = 'CommunicationNetwork';
+      }
+      element.type = normalizedType;
     }
 
     if (data.documentation !== undefined) {
@@ -640,11 +651,14 @@ export class ModelManipulator {
       }
     }
 
+    // Normalize view type: All views under <diagrams> must be "Diagram" for Archi 5.7 compatibility
+    const normalizedType = 'Diagram';
+
     // Create view object
     const view: ViewObject = {
       id: identifier,
       name: data.name.trim(),
-      type: data.type?.trim(),
+      type: normalizedType,
       viewpoint: data.viewpoint?.trim(),
       documentation: data.documentation?.trim(),
       properties: data.properties ? { ...data.properties } : {},
@@ -699,10 +713,8 @@ export class ModelManipulator {
       view.name = data.name.trim();
     }
 
-    // Update type
-    if (data.type !== undefined) {
-      view.type = data.type.trim();
-    }
+    // Update type - All views under <diagrams> must be "Diagram" for Archi 5.7 compatibility
+    view.type = 'Diagram';
 
     // Update viewpoint
     if (data.viewpoint !== undefined) {
@@ -1416,6 +1428,13 @@ export class ModelManipulator {
             path: `element[${element.id}].type`
           })));
         }
+        // Check for deprecated "Network" type - should be "CommunicationNetwork" for Archi 5.7 compatibility
+        if (element.type === 'Network') {
+          errors.push({
+            message: `Element type "Network" is deprecated. Use "CommunicationNetwork" instead for Archi 5.7 compatibility.`,
+            path: `element[${element.id}].type`
+          });
+        }
       }
     }
 
@@ -1427,6 +1446,14 @@ export class ModelManipulator {
         this.model.relationships
       );
       errors.push(...viewResult.errors);
+      
+      // Check that all views have type "Diagram" for Archi 5.7 compatibility
+      if (!view.type || view.type !== 'Diagram') {
+        errors.push({
+          message: `View type must be "Diagram" for Archi 5.7 compatibility. Found: ${view.type || 'undefined'}`,
+          path: `view[${view.id}].type`
+        });
+      }
     }
 
     // 5. Property Definition References
